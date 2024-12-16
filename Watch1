@@ -1,0 +1,154 @@
+<template>
+  <v-app class="bg-surface-variant overflow-hidden">
+    <NavBarComponent />
+    <v-container fluid class="operationStatusContainer">
+      <v-row>
+        <v-col class="lineOperationStatus">
+          <operation-status-screen :coordinates="coordinates" :operation="operation" />
+        </v-col>
+        <v-col class="imageOperationStatus"></v-col>
+      </v-row>
+    </v-container>
+  </v-app>
+</template>
+
+<script>
+import NavBarComponent from './pages/NavBarComponent.vue'
+import OperationStatusScreen from '@/components/pages/OperationStatusScreen.vue'
+import { FetchAPI } from '@/utility/apiRequest'
+
+export default {
+  name: 'RealTimeAndon',
+  components: {
+    NavBarComponent,
+    OperationStatusScreen,
+  },
+  data() {
+    return {
+      coordinates: [],
+      operation: null,
+    }
+  },
+  mounted() {
+    this.pollForChanges()
+  },
+  methods: {
+    /**
+     * Polls the database for changes and updates only if necessary
+     */
+    async pollForChanges() {
+      try {
+        const api = new FetchAPI()
+        while (true) {
+          const response = await api.get('/api/get-coordinates')
+          const newCoordinates = [...response.data]
+
+          // Update only if data has changed
+          if (JSON.stringify(this.coordinates) !== JSON.stringify(newCoordinates)) {
+            this.coordinates = newCoordinates
+            this.operation = this.coordinates[this.coordinates.length - 1].operation_status
+          }
+        }
+      } catch (error) {
+        console.log('Error polling for changes:', error)
+      }
+    },
+  },
+}
+</script>
+------------------
+import { shallowMount } from '@vue/test-utils'
+import RealTimeAndon from '@/components/RealTimeAndon.vue'
+import { FetchAPI } from '@/utility/apiRequest'
+
+jest.mock('@/utility/apiRequest', () => {
+  return jest.fn().mockImplementation(() => ({
+    get: jest.fn(() =>
+      Promise.resolve({
+        success: true,
+        data: [
+          { x: 10, y: 20, width: 30, height: 40, operation_status: 1 },
+        ],
+      })
+    ),
+  }))
+})
+
+jest.spyOn(console, 'log').mockImplementation(() => {})
+
+describe('Testing RealTimeAndon.vue', () => {
+  const wrapper = shallowMount(RealTimeAndon, {
+    global: {
+      components: {
+        VApp: 'V-app',
+        VAppBar: 'v-app-bar',
+        VSheet: 'v-sheet',
+        VCol: 'v-col',
+        VRow: 'v-row',
+        VMain: 'v-main',
+        VLayout: 'v-layout',
+        NavBarComponent: 'NavBarComponent',
+        LineChartAndIndicator: 'line-chart-and-indicator',
+        VContainer: 'v-container',
+      },
+    },
+  })
+
+  test('Test if wrapper exist', () => {
+    expect(wrapper.exists()).toBeTruthy()
+  })
+
+  test('Test pollForChanges updates data when new coordinates are fetched', async () => {
+    const fetchAPIInstance = new FetchAPI()
+    const mockGet = fetchAPIInstance.get
+
+    // Simulate the pollForChanges function
+    await wrapper.vm.pollForChanges()
+
+    // Check if API was called
+    expect(mockGet).toHaveBeenCalledWith('/api/get-coordinates')
+
+    // Check if the coordinates and operation were updated
+    expect(wrapper.vm.coordinates).toEqual([
+      { x: 10, y: 20, width: 30, height: 40, operation_status: 1 },
+    ])
+    expect(wrapper.vm.operation).toBe(1)
+  })
+
+  test('Test pollForChanges does not update data when coordinates are unchanged', async () => {
+    const fetchAPIInstance = new FetchAPI()
+    const mockGet = fetchAPIInstance.get
+
+    // Set initial data
+    wrapper.setData({
+      coordinates: [{ x: 10, y: 20, width: 30, height: 40, operation_status: 1 }],
+    })
+
+    // Simulate the pollForChanges function
+    await wrapper.vm.pollForChanges()
+
+    // Check if API was called
+    expect(mockGet).toHaveBeenCalledWith('/api/get-coordinates')
+
+    // Ensure data remains the same
+    expect(wrapper.vm.coordinates).toEqual([
+      { x: 10, y: 20, width: 30, height: 40, operation_status: 1 },
+    ])
+    expect(wrapper.vm.operation).toBe(1)
+  })
+
+  test('Test pollForChanges handles API errors gracefully', async () => {
+    const fetchAPIInstance = new FetchAPI()
+    fetchAPIInstance.get.mockRejectedValueOnce(new Error('API Error'))
+
+    // Simulate the pollForChanges function
+    await wrapper.vm.pollForChanges()
+
+    // Ensure coordinates are not updated on error
+    expect(wrapper.vm.coordinates).toEqual([])
+    expect(wrapper.vm.operation).toBeNull()
+
+    // Check if the error was logged
+    expect(console.log).toHaveBeenCalledWith('Error polling for changes:', expect.any(Error))
+  })
+})
