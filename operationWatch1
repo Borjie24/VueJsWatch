@@ -1,0 +1,409 @@
+<template>
+  <v-container fluid>
+    <v-row>
+      <v-col cols="12">
+        <common-table :style="determineBackgroundColor()"></common-table>
+      </v-col>
+      <v-col class="ma-2">
+        <canvas ref="myCanvas" width="416" height="700" class="canvas"></canvas>
+      </v-col>
+    </v-row>
+  </v-container>
+</template>
+
+<script>
+import { FetchAPI } from '@/utility/apiRequest'
+import CommonTable from '../common/CommonTable.vue'
+
+export default {
+  name: 'OperationStatusScreen',
+  components: {
+    CommonTable,
+  },
+  props: {
+    coordinates: {
+      type: Array,
+      required: true,
+    },
+    operation: {
+      type: Number,
+      required: true,
+    },
+  },
+  data() {
+    return {
+      imageUrl: null,
+    }
+  },
+  mounted() {
+    if (!this.imageUrl) {
+      this.fetchImage()
+    }
+  },
+  watch: {
+    coordinates: {
+      handler(newCoordinates) {
+        this.createCanvas(this.imageUrl, newCoordinates)
+      },
+      immediate: true,
+    },
+  },
+  methods: {
+    /**
+     * Function used for getting the image
+     */
+    async fetchImage() {
+      try {
+        const api = new FetchAPI()
+        const response = await api.get('/assets/images/line_chart.png', {
+          responseType: 'blob',
+        })
+        this.imageUrl = URL.createObjectURL(response)
+        this.createCanvas(this.imageUrl, this.coordinates)
+      } catch (err) {
+        console.log(err)
+      }
+    },
+    /**
+     * Retrieves the operation process coordinates
+     */
+    async fetchProcessCoordinates() {
+      return this.coordinates
+    },
+    /**
+     * Create boxes with number label
+     * @param {string} imageURL - image URL
+     * @param {Array} coordinates - array of coordinates
+     */
+    async createCanvas(imageURL, coordinates) {
+      if (!coordinates || coordinates.length === 0) return
+
+      const canvas = this.$refs.myCanvas
+      const ctx = canvas.getContext('2d')
+      const image = new Image()
+      image.src = imageURL
+      const drawCircleLabel = (ctx, x, y, radius, label, fillStyle, strokeStyle) => {
+        ctx.beginPath()
+        ctx.arc(x, y, radius, 0, Math.PI * 2)
+        ctx.closePath()
+        ctx.fillStyle = fillStyle
+        ctx.fill()
+        ctx.strokeStyle = strokeStyle
+        ctx.stroke()
+        ctx.font = 'bold 14px Arial'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillStyle = 'white'
+        ctx.fillText(label, x, y)
+      }
+
+      image.onload = () => {
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+        coordinates.forEach((coord) => {
+          ctx.fillStyle = this.determineColor(coord.operation_status)
+          ctx.fillRect(coord.x, coord.y, coord.width, coord.height)
+          ctx.strokeStyle = 'white'
+          ctx.lineWidth = 3
+          ctx.strokeRect(coord.x, coord.y, coord.width, coord.height)
+          const circleX = coord.x + coord.width / 2
+          const circleY = coord.y + coord.height / 2
+          drawCircleLabel(ctx, circleX, circleY, 15, coord.process_id, 'transparent', 'white')
+        })
+      }
+    },
+    /**
+     * Determines the color of the operation based on the status value
+     * @param {int} status - status value of the operation
+     * @returns {string} color based on the status
+     */
+    determineColor(status) {
+      let statusColor = ''
+
+      switch (status) {
+        case 1: // 稼働中 In operation
+          statusColor = 'green'
+          break
+        case 2: // 準備中 preparation
+          statusColor = '#FFCA37'
+          break
+        case 3: // 異常停止 abnormal stop
+          statusColor = 'red'
+          break
+        default:
+          statusColor = 'grey'
+      }
+      return statusColor
+    },
+    /**
+     * Function for changing the background color of the operation status label
+     * @returns {Object} the style of the label based on the operation status
+     */
+    determineBackgroundColor() {
+      const color = {
+        1: 'green',
+        2: '#FFCA37',
+        3: 'red',
+      }
+
+      const font = {
+        2: 'black',
+      }
+
+      return {
+        backgroundColor: color[this.operation] || 'gray',
+        color: font[this.operation] || 'white',
+      }
+    },
+  },
+}
+</script>
+
+------------------------------------
+
+import { shallowMount } from '@vue/test-utils'
+import OperationStatusScreen from '@/components/pages/OperationStatusScreen.vue'
+import FetchAPI from '@/utility/apiRequest'
+import 'jest-canvas-mock'
+
+jest.mock('@/utility/apiRequest', () => {
+  return jest.fn().mockImplementation(() => ({
+    get: jest.fn(() => Promise.resolve({ success: true, data: [] })),
+  }))
+})
+
+jest.spyOn(console, 'log').mockImplementation(() => {})
+
+describe('Testing OperationStatusScreen.vue', () => {
+  const mockBlobUrl = 'blob:http://example.com/fake-blob-url'
+
+  test('should not fetch an image and set imageUrl to null', async () => {
+    const wrapper = shallowMount(OperationStatusScreen, {
+      global: {
+        components: {
+          VSimpleTable: 'v-simple-table',
+          VContainer: 'v-container',
+          VCol: 'v-col',
+          VRow: 'v-row',
+        },
+      },
+      $refs: {
+        myCanvas: document.createElement('canvas'),
+      },
+      fetchProcessCoordinates: jest.fn().mockResolvedValue(),
+      determineColor: jest.fn().mockReturnValue('#FF0000'),
+      rectangles: [
+        { x: 10, y: 20, width: 50, height: 50, operation_status: 1, process_id: 1 },
+        { x: 70, y: 80, width: 50, height: 50, operation_status: 3, process_id: 2 },
+      ],
+    })
+
+    const mockBlob = new Blob(['image content'], { type: 'image/png' })
+    const mockApi = new FetchAPI()
+    mockApi.get.mockResolvedValue(mockBlob)
+
+    const mockCreateObjectURL = jest
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:http://localhost/image-url')
+
+    wrapper.vm.fetchImage()
+
+    expect(wrapper.vm.imageUrl).toBe(null)
+    mockCreateObjectURL.mockRestore()
+  })
+
+  test('renders the canvas element', () => {
+    const wrapper = shallowMount(OperationStatusScreen, {
+      global: {
+        components: {
+          VSimpleTable: 'v-simple-table',
+          VContainer: 'v-container',
+          VCol: 'v-col',
+          VRow: 'v-row',
+        },
+      },
+      $refs: {
+        myCanvas: document.createElement('canvas'),
+      },
+      fetchProcessCoordinates: jest.fn().mockResolvedValue(),
+      determineColor: jest.fn().mockReturnValue('#FF0000'),
+      rectangles: [
+        { x: 10, y: 20, width: 50, height: 50, operation_status: 1, process_id: 1 },
+        { x: 70, y: 80, width: 50, height: 50, operation_status: 3, process_id: 2 },
+      ],
+    })
+
+    expect(wrapper.find('canvas').exists()).toBe(true)
+  })
+
+  test('fetchProcessCoordinates fetches and updates rectangles', async () => {
+    const wrapper = shallowMount(OperationStatusScreen, {
+      global: {
+        components: {
+          VSimpleTable: 'v-simple-table',
+          VContainer: 'v-container',
+          VCol: 'v-col',
+          VRow: 'v-row',
+        },
+      },
+      $refs: {
+        myCanvas: document.createElement('canvas'),
+      },
+      fetchProcessCoordinates: jest.fn().mockResolvedValue(),
+      determineColor: jest.fn().mockReturnValue('#FF0000'),
+      rectangles: [
+        { x: 10, y: 20, width: 50, height: 50, operation_status: 1, process_id: 1 },
+        { x: 70, y: 80, width: 50, height: 50, operation_status: 3, process_id: 2 },
+      ],
+    })
+
+    await wrapper.vm.fetchProcessCoordinates()
+
+    expect(wrapper.vm.rectangles).toHaveLength(0)
+  })
+
+  test('fetchProcessCoordinates updates rectangles when setData is used', async () => {
+    const wrapper = shallowMount(OperationStatusScreen, {
+      global: {
+        components: {
+          VSimpleTable: 'v-simple-table',
+          VContainer: 'v-container',
+          VCol: 'v-col',
+          VRow: 'v-row',
+        },
+      },
+      $refs: {
+        myCanvas: document.createElement('canvas'),
+      },
+      fetchProcessCoordinates: jest.fn().mockResolvedValue(),
+      rectangles: [
+        { width: 70, height: 40, x: 65, y: 515, process_id: 1, operation_status: 1 },
+        { width: 70, height: 40, x: 65, y: 425, process_id: 2, operation_status: 1 },
+        { width: 70, height: 40, x: 65, y: 350, process_id: 3, operation_status: 3 },
+        { width: 70, height: 40, x: 150, y: 265, process_id: 4, operation_status: 3 },
+        { width: 70, height: 40, x: 100, y: 190, process_id: 5, operation_status: 1 },
+        { width: 70, height: 40, x: 35, y: 125, process_id: 6, operation_status: 1 },
+        { width: 70, height: 40, x: 35, y: 45, process_id: 7, operation_status: 1 },
+        { width: 70, height: 40, x: 185, y: 45, process_id: 8, operation_status: 1 },
+        { width: 70, height: 40, x: 290, y: 115, process_id: 9, operation_status: 3 },
+        { width: 70, height: 40, x: 290, y: 200, process_id: 10, operation_status: 1 },
+        { width: 70, height: 40, x: 290, y: 335, process_id: 11, operation_status: 1 },
+        { width: 70, height: 40, x: 290, y: 400, process_id: 12, operation_status: 3 },
+        { width: 70, height: 40, x: 290, y: 500, process_id: 13, operation_status: 3 },
+        { width: 70, height: 40, x: 240, y: 615, process_id: 14, operation_status: 1 },
+      ],
+    })
+
+    wrapper.setData({
+      rectangles: [
+        { width: 70, height: 40, x: 65, y: 515, process_id: 1, operation_status: 1 },
+        { width: 70, height: 40, x: 65, y: 425, process_id: 2, operation_status: 1 },
+        { width: 70, height: 40, x: 65, y: 350, process_id: 3, operation_status: 3 },
+        { width: 70, height: 40, x: 150, y: 265, process_id: 4, operation_status: 3 },
+        { width: 70, height: 40, x: 100, y: 190, process_id: 5, operation_status: 1 },
+        { width: 70, height: 40, x: 35, y: 125, process_id: 6, operation_status: 1 },
+        { width: 70, height: 40, x: 35, y: 45, process_id: 7, operation_status: 1 },
+        { width: 70, height: 40, x: 185, y: 45, process_id: 8, operation_status: 1 },
+        { width: 70, height: 40, x: 290, y: 115, process_id: 9, operation_status: 3 },
+        { width: 70, height: 40, x: 290, y: 200, process_id: 10, operation_status: 1 },
+        { width: 70, height: 40, x: 290, y: 335, process_id: 11, operation_status: 1 },
+        { width: 70, height: 40, x: 290, y: 400, process_id: 12, operation_status: 3 },
+        { width: 70, height: 40, x: 290, y: 500, process_id: 13, operation_status: 3 },
+        { width: 70, height: 40, x: 240, y: 615, process_id: 14, operation_status: 1 },
+      ],
+    })
+
+    await wrapper.vm.fetchProcessCoordinates()
+
+    expect(wrapper.vm.rectangles).toHaveLength(14)
+  })
+
+  test('should return correct color for status when determineColor is called with specific parameters', () => {
+    const wrapper = shallowMount(OperationStatusScreen, {
+      global: {
+        components: {
+          VSimpleTable: 'v-simple-table',
+          VContainer: 'v-container',
+          VCol: 'v-col',
+          VRow: 'v-row',
+        },
+      },
+      $refs: {
+        myCanvas: document.createElement('canvas'),
+      },
+      fetchProcessCoordinates: jest.fn().mockResolvedValue(),
+      determineColor: jest.fn().mockReturnValue('#FF0000'),
+      rectangles: [
+        { x: 10, y: 20, width: 50, height: 50, operation_status: 1, process_id: 1 },
+        { x: 70, y: 80, width: 50, height: 50, operation_status: 3, process_id: 2 },
+      ],
+    })
+
+    expect(wrapper.vm.determineColor(1)).toBe('green')
+    expect(wrapper.vm.determineColor(2)).toBe('#FFCA37')
+    expect(wrapper.vm.determineColor(3)).toBe('red')
+    expect(wrapper.vm.determineColor(4)).toBe('grey')
+  })
+
+  test('should create a blob URL and draw on the canvas', async () => {
+    const wrapper = shallowMount(OperationStatusScreen, {
+      global: {
+        components: {
+          VSimpleTable: 'v-simple-table',
+          VContainer: 'v-container',
+          VCol: 'v-col',
+          VRow: 'v-row',
+        },
+      },
+      $refs: {
+        myCanvas: document.createElement('canvas'),
+      },
+      fetchProcessCoordinates: jest.fn().mockResolvedValue(),
+      rectangles: [
+        { x: 10, y: 20, width: 50, height: 50, operation_status: 1, process_id: 1 },
+        { x: 70, y: 80, width: 50, height: 50, operation_status: 3, process_id: 2 },
+      ],
+    })
+
+    const response = new Blob(['image data'], { type: 'image/png' })
+    const imageURL = URL.createObjectURL(response)
+
+    const mockImage = new Image()
+    mockImage.onload = jest.fn()
+    jest.spyOn(window, 'Image').mockImplementation(() => mockImage)
+
+    const ctx = {
+      beginPath: jest.fn(),
+      arc: jest.fn(),
+      closePath: jest.fn(),
+      fillStyle: '',
+      fill: jest.fn(),
+      strokeStyle: '',
+      stroke: jest.fn(),
+      font: '',
+      textAlign: '',
+      textBaseline: '',
+      fillText: jest.fn(),
+      drawImage: jest.fn(),
+      fillRect: jest.fn(),
+      lineWidth: 0,
+      strokeRect: jest.fn(),
+    }
+    jest.spyOn(wrapper.vm.$refs.myCanvas, 'getContext').mockReturnValue(ctx)
+    wrapper.vm.fetchProcessCoordinates = jest.fn().mockResolvedValue()
+    await wrapper.vm.createCanvas(imageURL)
+    mockImage.onload()
+    expect(URL.createObjectURL).toHaveBeenCalledWith(response)
+    expect(wrapper.vm.fetchProcessCoordinates).toHaveBeenCalled()
+    expect(ctx.drawImage).toHaveBeenCalledWith(
+      mockImage,
+      0,
+      0,
+      wrapper.vm.$refs.myCanvas.width,
+      wrapper.vm.$refs.myCanvas.height,
+    )
+    expect(ctx.fillRect).toHaveBeenCalledTimes(0)
+    expect(ctx.strokeRect).toHaveBeenCalledTimes(0)
+  })
+})
+
