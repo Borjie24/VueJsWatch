@@ -1,0 +1,129 @@
+<template>
+  <v-app class="bg-surface-variant overflow-hidden">
+    <NavBarComponent />
+    <v-container fluid class="operationStatusContainer">
+      <v-row>
+        <v-col class="lineOperationStatus">
+          <operation-status-screen :coordinates="coordinates" :operation="operation" />
+        </v-col>
+        <v-col class="imageOperationStatus"></v-col>
+      </v-row>
+    </v-container>
+  </v-app>
+</template>
+
+<script>
+import NavBarComponent from './pages/NavBarComponent.vue'
+import OperationStatusScreen from '@/components/pages/OperationStatusScreen.vue'
+import { FetchAPI } from '@/utility/apiRequest'
+
+export default {
+  name: 'RealTimeAndon',
+  components: {
+    NavBarComponent,
+    OperationStatusScreen,
+  },
+  data() {
+    return {
+      coordinates: [],
+      operation: null,
+    }
+  },
+  mounted() {
+    this.fetchCoordinates()
+  },
+  methods: {
+    /**
+     * Retrieves the operation process coordinates in real-time
+     */
+    async fetchCoordinates() {
+      try {
+        const api = new FetchAPI()
+        while (true) {
+          const response = await api.get('/api/get-coordinates')
+          this.coordinates = [...response.data]
+          this.operation = this.coordinates[this.coordinates.length - 1].operation_status
+          // Let Vue handle updates, no manual delays
+        }
+      } catch (error) {
+        console.log('Error fetching coordinates:', error)
+      }
+    },
+  },
+}
+</script>
+------------------------
+
+import { shallowMount } from '@vue/test-utils'
+import RealTimeAndon from '@/components/RealTimeAndon.vue'
+import { FetchAPI } from '@/utility/apiRequest'
+
+jest.mock('@/utility/apiRequest', () => {
+  return jest.fn().mockImplementation(() => ({
+    get: jest.fn(() =>
+      Promise.resolve({
+        success: true,
+        data: [
+          { x: 10, y: 20, width: 30, height: 40, operation_status: 1 },
+        ],
+      })
+    ),
+  }))
+})
+
+jest.spyOn(console, 'log').mockImplementation(() => {})
+
+describe('Testing RealTimeAndon.vue', () => {
+  const wrapper = shallowMount(RealTimeAndon, {
+    global: {
+      components: {
+        VApp: 'V-app',
+        VAppBar: 'v-app-bar',
+        VSheet: 'v-sheet',
+        VCol: 'v-col',
+        VRow: 'v-row',
+        VMain: 'v-main',
+        VLayout: 'v-layout',
+        NavBarComponent: 'NavBarComponent',
+        OperationStatusScreen: 'operation-status-screen',
+        VContainer: 'v-container',
+      },
+    },
+  })
+
+  test('Test if wrapper exists', () => {
+    expect(wrapper.exists()).toBeTruthy()
+  })
+
+  test('Test fetchCoordinates updates data with new API response', async () => {
+    const fetchAPIInstance = new FetchAPI()
+    const mockGet = fetchAPIInstance.get
+
+    // Simulate fetchCoordinates
+    await wrapper.vm.fetchCoordinates()
+
+    // Check if API was called
+    expect(mockGet).toHaveBeenCalledWith('/api/get-coordinates')
+
+    // Check if the coordinates and operation were updated
+    expect(wrapper.vm.coordinates).toEqual([
+      { x: 10, y: 20, width: 30, height: 40, operation_status: 1 },
+    ])
+    expect(wrapper.vm.operation).toBe(1)
+  })
+
+  test('Test fetchCoordinates handles API errors gracefully', async () => {
+    const fetchAPIInstance = new FetchAPI()
+    fetchAPIInstance.get.mockRejectedValueOnce(new Error('API Error'))
+
+    // Simulate fetchCoordinates
+    await wrapper.vm.fetchCoordinates()
+
+    // Ensure coordinates are not updated on error
+    expect(wrapper.vm.coordinates).toEqual([])
+    expect(wrapper.vm.operation).toBeNull()
+
+    // Check if the error was logged
+    expect(console.log).toHaveBeenCalledWith('Error fetching coordinates:', expect.any(Error))
+  })
+})
