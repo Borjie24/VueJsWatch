@@ -1,0 +1,150 @@
+import { shallowMount } from '@vue/test-utils'
+import OperationStatusScreen from '@/components/OperationStatusScreen.vue'
+
+describe('OperationStatusScreen.vue - drawCircleLabel', () => {
+  let wrapper
+  let mockContext
+
+  beforeEach(() => {
+    wrapper = shallowMount(OperationStatusScreen)
+
+    // Mock canvas context methods
+    mockContext = {
+      beginPath: jest.fn(),
+      arc: jest.fn(),
+      closePath: jest.fn(),
+      fill: jest.fn(),
+      stroke: jest.fn(),
+      fillText: jest.fn(),
+      font: '',
+      textAlign: '',
+      textBaseline: '',
+      fillStyle: '',
+      strokeStyle: '',
+    }
+  })
+
+  test('drawCircleLabel draws a circle and label correctly', () => {
+    // Call the method with mock parameters
+    const x = 50
+    const y = 50
+    const radius = 15
+    const label = '123'
+    const fillStyle = 'transparent'
+    const strokeStyle = 'white'
+
+    wrapper.vm.drawCircleLabel(mockContext, x, y, radius, label, fillStyle, strokeStyle)
+
+    // Assertions for canvas context method calls
+    expect(mockContext.beginPath).toHaveBeenCalled()
+    expect(mockContext.arc).toHaveBeenCalledWith(x, y, radius, 0, Math.PI * 2)
+    expect(mockContext.closePath).toHaveBeenCalled()
+    expect(mockContext.fillStyle).toBe(fillStyle)
+    expect(mockContext.fill).toHaveBeenCalled()
+    expect(mockContext.strokeStyle).toBe(strokeStyle)
+    expect(mockContext.stroke).toHaveBeenCalled()
+    expect(mockContext.font).toBe('bold 14px Arial')
+    expect(mockContext.textAlign).toBe('center')
+    expect(mockContext.textBaseline).toBe('middle')
+    expect(mockContext.fillText).toHaveBeenCalledWith(label, x, y)
+  })
+})
+
+-------
+import { shallowMount } from '@vue/test-utils'
+import OperationStatusScreen from '@/components/OperationStatusScreen.vue'
+
+describe('OperationStatusScreen.vue - createCanvas', () => {
+  let wrapper
+  let mockContext
+
+  beforeEach(() => {
+    wrapper = shallowMount(OperationStatusScreen, {
+      mocks: {
+        $refs: {
+          myCanvas: {
+            getContext: jest.fn(),
+          },
+        },
+      },
+    })
+
+    // Mock canvas context methods
+    mockContext = {
+      drawImage: jest.fn(),
+      fillRect: jest.fn(),
+      strokeRect: jest.fn(),
+      beginPath: jest.fn(),
+      arc: jest.fn(),
+      closePath: jest.fn(),
+      fill: jest.fn(),
+      stroke: jest.fn(),
+      lineWidth: null,
+      fillStyle: '',
+      strokeStyle: '',
+    }
+
+    wrapper.vm.$refs.myCanvas.getContext.mockReturnValue(mockContext)
+
+    // Mock rectangles
+    wrapper.setData({
+      rectangles: [
+        { x: 10, y: 20, width: 50, height: 50, operation_status: 1, process_id: 'A' },
+        { x: 60, y: 80, width: 40, height: 40, operation_status: 2, process_id: 'B' },
+      ],
+    })
+
+    // Spy on drawCircleLabel
+    jest.spyOn(wrapper.vm, 'drawCircleLabel').mockImplementation(() => {})
+  })
+
+  test('should process each rectangle and draw on the canvas', async () => {
+    const imageURL = 'dummy_image_url'
+
+    // Mock Image and its onload event
+    const imageMock = { src: '', onload: null }
+    global.Image = jest.fn(() => imageMock)
+
+    // Call createCanvas
+    await wrapper.vm.createCanvas(imageURL)
+
+    // Trigger the onload callback
+    imageMock.onload()
+
+    // Assertions for drawImage
+    expect(mockContext.drawImage).toHaveBeenCalledWith(imageMock, 0, 0, 416, 700)
+
+    // Assertions for fillRect and strokeRect
+    expect(mockContext.fillStyle).toBe('green') // First rectangle
+    expect(mockContext.strokeStyle).toBe('white')
+    expect(mockContext.lineWidth).toBe(3)
+    expect(mockContext.fillRect).toHaveBeenCalledWith(10, 20, 50, 50)
+    expect(mockContext.strokeRect).toHaveBeenCalledWith(10, 20, 50, 50)
+
+    expect(mockContext.fillStyle).toBe('#FFCA37') // Second rectangle
+    expect(mockContext.strokeStyle).toBe('#424242')
+    expect(mockContext.fillRect).toHaveBeenCalledWith(60, 80, 40, 40)
+    expect(mockContext.strokeRect).toHaveBeenCalledWith(60, 80, 40, 40)
+
+    // Verify drawCircleLabel was called for each rectangle
+    expect(wrapper.vm.drawCircleLabel).toHaveBeenCalledTimes(2)
+    expect(wrapper.vm.drawCircleLabel).toHaveBeenCalledWith(
+      mockContext,
+      35, // Circle X for the first rectangle
+      45, // Circle Y for the first rectangle
+      15,
+      'A',
+      'transparent',
+      'white',
+    )
+    expect(wrapper.vm.drawCircleLabel).toHaveBeenCalledWith(
+      mockContext,
+      80, // Circle X for the second rectangle
+      100, // Circle Y for the second rectangle
+      15,
+      'B',
+      'transparent',
+      '#424242',
+    )
+  })
+})
