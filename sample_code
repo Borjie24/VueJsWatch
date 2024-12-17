@@ -1,0 +1,45 @@
+from app import db  # Import your database instance
+
+def increment_last_width():
+    """Background function to increment the last coordinate's width every 2 seconds and update the database"""
+    while True:
+        # Fetch the last coordinate with process_id <= 14
+        last_entry = (
+            OperationInformationDb.query.filter(OperationInformationDb.process_id <= 14)
+            .order_by(OperationInformationDb.process_id.desc())  # Get the last entry
+            .first()
+        )
+        
+        if last_entry:
+            # Increment the width
+            last_entry.coordinates.width += 1
+
+            # Commit the update to the database
+            db.session.commit()
+        
+        time.sleep(2)
+---------------------------------
+def test_increment_last_width_db(mock_sleep):
+    # Add test data to the database
+    test_entry = OperationInformationDb(
+        process_id=14,
+        operation_status="active",
+        coordinates=CoordinatesDb(x_position=10, y_position=20, width=5, height=10)
+    )
+    db.session.add(test_entry)
+    db.session.commit()
+
+    # Start the background thread
+    thread = Thread(target=increment_last_width, daemon=True)
+    thread.start()
+
+    # Wait for 3 seconds to allow at least one increment
+    time.sleep(3)
+
+    # Fetch the updated entry from the database
+    updated_entry = OperationInformationDb.query.filter_by(process_id=14).first()
+    assert updated_entry.coordinates.width == 6  # Check if the width incremented
+
+    # Clean up test data
+    db.session.delete(updated_entry)
+    db.session.commit()
