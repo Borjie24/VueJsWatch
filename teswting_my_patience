@@ -1,0 +1,102 @@
+  test('should process each rectangle and draw on the canvas', async () => {
+    const imageURL = 'dummy_image_url';
+    const imageMock = { src: '', onload: null };
+    global.Image = jest.fn(() => imageMock);
+
+    await wrapper.vm.createCanvas(imageURL);
+    imageMock.onload();
+
+    // Verify that drawImage was called for the image
+    expect(mockContext.drawImage).toHaveBeenCalledWith(expect.any(Object), 0, 0);
+
+    // Verify that rectangles were processed
+    wrapper.vm.rectangles.forEach((rect, index) => {
+      expect(mockContext.fillRect).toHaveBeenCalledWith(rect.x, rect.y, rect.width, rect.height);
+      expect(wrapper.vm.drawCircleLabel).toHaveBeenCalledWith(
+        mockContext,
+        rect.x + rect.width / 2,
+        rect.y + rect.height / 2,
+        20, // Example radius
+        rect.process_id,
+        expect.any(String),
+        expect.any(String)
+      );
+    });
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    delete global.Image;
+  });
+});
+----------------------
+test('should update rectangles with response data in fetchProcessCoordinates', async () => {
+  // Mock the response to be returned by the API
+  const mockResponse = { data: [{ x: 10, y: 20, width: 50, height: 50, operation_status: 1 }] }
+  FetchAPI.prototype.get.mockResolvedValue(mockResponse)  // Ensure this is mocking the API correctly
+
+  // Call the method
+  await wrapper.vm.fetchProcessCoordinates()
+
+  // Check that rectangles have been updated
+  expect(wrapper.vm.rectangles).toEqual(mockResponse.data)
+})
+-----------
+test('should create imageUrl and call createCanvas in fetchImage', async () => {
+  const mockResponse = new Blob(['image content'], { type: 'image/png' })  // Mock image blob response
+  const mockApi = new FetchAPI()
+  mockApi.get.mockResolvedValue(mockResponse)
+
+  const mockCreateObjectURL = jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:http://localhost/image-url')
+
+  // Call the method
+  await wrapper.vm.fetchImage()
+
+  // Check that imageUrl was set and createCanvas was called
+  expect(wrapper.vm.imageUrl).toBe('blob:http://localhost/image-url')
+  expect(wrapper.vm.createCanvas).toHaveBeenCalledWith('blob:http://localhost/image-url')
+
+  // Restore the mock for createObjectURL
+  mockCreateObjectURL.mockRestore()
+})
+----------------
+describe('YourComponent', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    // Initialize wrapper, mock the necessary API calls, etc.
+    wrapper = shallowMount(YourComponent, {
+      mocks: {
+        $fetch: jest.fn(),
+      },
+    });
+  });
+
+  describe('fetchProcessCoordinates', () => {
+    test('should update rectangles with response data in fetchProcessCoordinates', async () => {
+      const mockResponse = { data: [{ x: 10, y: 20, width: 50, height: 50, operation_status: 1 }] };
+      FetchAPI.prototype.get.mockResolvedValue(mockResponse);
+
+      await wrapper.vm.fetchProcessCoordinates();
+
+      expect(wrapper.vm.rectangles).toEqual(mockResponse.data);
+    });
+  });
+
+  describe('fetchImage', () => {
+    test('should create imageUrl and call createCanvas in fetchImage', async () => {
+      const mockResponse = new Blob(['image content'], { type: 'image/png' });
+      const mockApi = new FetchAPI();
+      mockApi.get.mockResolvedValue(mockResponse);
+
+      const mockCreateObjectURL = jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:http://localhost/image-url');
+
+      await wrapper.vm.fetchImage();
+
+      expect(wrapper.vm.imageUrl).toBe('blob:http://localhost/image-url');
+      expect(wrapper.vm.createCanvas).toHaveBeenCalledWith('blob:http://localhost/image-url');
+
+      mockCreateObjectURL.mockRestore();
+    });
+  });
+});
