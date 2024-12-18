@@ -1,0 +1,38 @@
+def test_update_units(self):
+    """Test if the planned_number_units is successfully updated"""
+    # Create mock data
+    mock_coordinates = CoordinatesDb(
+        x_position=65, y_position=515, width=70, height=40
+    )
+    mock_operation_information = OperationInformationDb(
+        process_name="部品供給機",
+        operation_status=1,
+        planned_number_units=24,
+        product_number=2,
+        facility_cycle_time=2,
+        coordinates_id=1,
+    )
+    db.session.add(mock_coordinates)
+    db.session.add(mock_operation_information)
+    db.session.commit()
+
+    # Define the process_id and the new planned_number_units
+    process_id = mock_operation_information.process_id
+    new_planned_number_units = 50
+
+    # Perform the PUT request
+    put_response = self.client.put(
+        f"/api/update-units/{process_id}",
+        json={"params": {"planned_number_units": new_planned_number_units}},
+    )
+
+    # Assert the response
+    data = put_response.get_json()
+    assert put_response.status_code == 200
+    assert data["success"] is True
+    assert data["message"] == "PLANNED_NUMBER_UNITS UPDATED SUCCESSFULLY"
+    assert data["updated_value"] == new_planned_number_units
+
+    # Verify the update in the database
+    updated_operation = OperationInformationDb.query.get(process_id)
+    assert updated_operation.planned_number_units == new_planned_number_units
