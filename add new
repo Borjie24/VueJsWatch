@@ -1,0 +1,32 @@
+test('should process each rectangle and draw on the canvas', async () => {
+  const imageURL = 'dummy_image_url';
+  const imageMock = { src: '', onload: null };
+  global.Image = jest.fn(() => imageMock);
+
+  // Simulate the image load
+  await wrapper.vm.createCanvas(imageURL);
+  imageMock.onload();
+
+  // Ensure the image URL was set correctly
+  expect(imageMock.src).toBe(imageURL);
+
+  // Verify the context operations
+  expect(mockContext.drawImage).toHaveBeenCalledTimes(1); // Image is drawn once
+  expect(mockContext.fillRect).toHaveBeenCalledTimes(wrapper.vm.rectangles.length); // One call per rectangle
+  expect(mockContext.strokeRect).toHaveBeenCalledTimes(wrapper.vm.rectangles.length);
+
+  // Ensure the `drawCircleLabel` was called for each rectangle
+  expect(wrapper.vm.drawCircleLabel).toHaveBeenCalledTimes(wrapper.vm.rectangles.length);
+
+  // Check parameters for the first rectangle (example)
+  const firstRectangle = wrapper.vm.rectangles[0];
+  expect(wrapper.vm.drawCircleLabel).toHaveBeenCalledWith(
+    mockContext,
+    firstRectangle.x + firstRectangle.width / 2,
+    firstRectangle.y + firstRectangle.height / 2,
+    15, // Assume radius
+    firstRectangle.process_id,
+    'transparent',
+    'white'
+  );
+});
