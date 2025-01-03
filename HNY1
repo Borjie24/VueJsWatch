@@ -1,0 +1,123 @@
+import { shallowMount } from '@vue/test-utils';
+import ProcessInformationScreen from '@/components/pages/ProcessInformationScreen.vue';
+import FetchAPI from '@/utility/apiRequest';
+import 'jest-canvas-mock';
+
+jest.mock('@/utility/apiRequest', () => {
+  return jest.fn().mockImplementation(() => ({
+    get: jest.fn(() => Promise.resolve({ success: true, data: [] })),
+    put: jest.fn(() => Promise.resolve({ success: true, message_content: 'Updated successfully' })),
+  }));
+});
+
+jest.spyOn(console, 'error').mockImplementation(() => {});
+
+describe('Testing ProcessInformationScreen.vue', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = shallowMount(ProcessInformationScreen, {
+      global: {
+        components: {
+          VContainer: 'v-container',
+          VCol: 'v-col',
+          VRow: 'v-row',
+        },
+      },
+      data() {
+        return {
+          reference_CT: 0,
+          operation_information: [],
+          incremented_units: 0,
+          incrementInterval: null,
+          nonDefectiveProducts: 0,
+          working_rate: 0,
+        };
+      },
+    });
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.clearAllTimers();
+  });
+
+  it('should initialize data correctly', () => {
+    expect(wrapper.vm.reference_CT).toBe(0);
+    expect(wrapper.vm.operation_information).toEqual([]);
+    expect(wrapper.vm.incremented_units).toBe(0);
+    expect(wrapper.vm.incrementInterval).toBeNull();
+  });
+
+  it('starts the incrementer and increments units', () => {
+    jest.useFakeTimers();
+    wrapper.setData({
+      operation_information: [{ planned_number_units: 10 }],
+      reference_CT: 1000,
+    });
+    wrapper.vm.startIncrementer();
+
+    jest.advanceTimersByTime(2000);
+    expect(wrapper.vm.incremented_units).toBe(2);
+  });
+
+  it('does not increment units if condition is false', () => {
+    jest.useFakeTimers();
+    wrapper.setData({ reference_CT: 0 });
+    wrapper.vm.startIncrementer();
+
+    jest.advanceTimersByTime(2000);
+    expect(wrapper.vm.incremented_units).toBe(0);
+  });
+
+  it('fetches all operations and initializes incrementer', async () => {
+    const mockData = [
+      { planned_number_units: 10, non_defective_products: 5 },
+    ];
+    const mockApi = new FetchAPI();
+    mockApi.get.mockResolvedValueOnce({ success: true, data: mockData });
+
+    await wrapper.vm.fetchAllOperations();
+
+    expect(wrapper.vm.operation_information).toEqual(mockData);
+    expect(wrapper.vm.nonDefectiveProducts).toBe(5);
+    expect(wrapper.vm.incremented_units).toBe(10);
+  });
+
+  it('handles fetchAllOperations error', async () => {
+    const mockApi = new FetchAPI();
+    const error = new Error('API error');
+    mockApi.get.mockRejectedValueOnce(error);
+
+    await wrapper.vm.fetchAllOperations();
+
+    expect(console.error).toHaveBeenCalledWith(error);
+  });
+
+  it('updates planned units and calculates working time during increment', async () => {
+    jest.useFakeTimers();
+    const calculateWorkingTimeSpy = jest.spyOn(wrapper.vm, 'calculateWorkingTime');
+    const updatePlannedUnitsSpy = jest.spyOn(wrapper.vm, 'updatePlannedUnits');
+
+    wrapper.setData({
+      operation_information: [{ planned_number_units: 10 }],
+      reference_CT: 1000,
+    });
+    wrapper.vm.startIncrementer();
+
+    jest.advanceTimersByTime(1000);
+
+    expect(wrapper.vm.incremented_units).toBe(1);
+    expect(updatePlannedUnitsSpy).toHaveBeenCalled();
+    expect(calculateWorkingTimeSpy).toHaveBeenCalled();
+  });
+
+  it('clears incrementer when restarting', () => {
+    const clearIntervalSpy = jest.spyOn(window, 'clearInterval');
+
+    wrapper.setData({ incrementInterval: setInterval(() => {}, 1000) });
+    wrapper.vm.clearIncrementer();
+
+    expect(clearIntervalSpy).toHaveBeenCalledWith(wrapper.vm.incrementInterval);
+  });
+});
