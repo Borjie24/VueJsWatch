@@ -1,0 +1,161 @@
+import { shallowMount } from '@vue/test-utils'
+import ProcessInformationScreen from '@/components/pages/ProcessInformationScreen.vue'
+import FetchAPI from '@/utility/apiRequest'
+import 'jest-canvas-mock'
+
+jest.mock('@/utility/apiRequest', () => {
+  return jest.fn().mockImplementation(() => ({
+    get: jest.fn(() => Promise.resolve({ success: true, data: [] })),
+    put: jest.fn(() => Promise.resolve({ success: true, message_content: 'Updated successfully' })),
+  }))
+})
+
+jest.spyOn(console, 'error').mockImplementation(() => {
+  return
+})
+
+describe('Testing ProcessInformationScreen.vue', () => {
+  const wrapper = shallowMount(ProcessInformationScreen, {
+    global: {
+      components: {
+        VContainer: 'v-container',
+        VCol: 'v-col',
+        VRow: 'v-row',
+      },
+    },
+    data() {
+      return {
+        reference_CT: 0,
+        operation_information: [],
+        incremented_units: 0,
+        incrementInterval: null,
+        nonDefectiveProducts: 0,
+        working_rate: 0,
+      }
+    },
+  })
+  window.console.log = jest.fn()
+
+  it('should initialize data correctly', () => {
+    expect(wrapper.vm.reference_CT).toBe(0)
+    expect(wrapper.vm.operation_information).toEqual([])
+    expect(wrapper.vm.incremented_units).toBe(0)
+    expect(wrapper.vm.incrementInterval).toBeNull()
+  })
+
+  it('starts the incrementer correctly', () => {
+    jest.useFakeTimers()
+    const mockOperation = { planned_number_units: 10 }
+    wrapper.setData({ operation_information: [mockOperation], reference_CT: 1000 })
+    wrapper.vm.startIncrementer()
+    jest.advanceTimersByTime(1000)
+    expect(wrapper.vm.incremented_units).toBe(1)
+    jest.clearAllTimers()
+  })
+
+  it('initializes incrementer correctly when there are operations', () => {
+    const mockOperation = { planned_number_units: 10 }
+    wrapper.setData({ operation_information: [mockOperation] })
+    wrapper.vm.initializeIncrementer()
+    expect(wrapper.vm.incremented_units).toBe(mockOperation.planned_number_units)
+  })
+
+  it('initializes incrementer correctly when there are no operations', () => {
+    const mockOperation = { planned_number_units: 0 }
+    wrapper.setData({ operation_information: [mockOperation] })
+    wrapper.vm.initializeIncrementer()
+    expect(wrapper.vm.incremented_units).toBe(0)
+  })
+
+  it('restarts the incrementer', () => {
+    const startIncrementerSpy = jest.spyOn(wrapper.vm, 'startIncrementer')
+    wrapper.vm.restartIncrementer()
+    expect(startIncrementerSpy).toHaveBeenCalled()
+  })
+
+  it('updates planned units with correct API call', async () => {
+    const wrapper = shallowMount(ProcessInformationScreen, {
+      global: {
+        components: {
+          VContainer: 'v-container',
+          VCol: 'v-col',
+          VRow: 'v-row',
+        },
+      },
+      data() {
+        return {
+          reference_CT: 0,
+          operation_information: [],
+          incremented_units: 0,
+          incrementInterval: null,
+          nonDefectiveProducts: 0,
+          working_rate: 0,
+        }
+      },
+    })
+
+    const mockOperation = {
+      process_id: 1,
+      process_name: '部品供給機',
+      product_number: 2,
+      planned_number_units: 54,
+      operation_status: 1,
+      non_defective_products: 20,
+      facility_cycle_time: 2,
+      coordinates: 1,
+    }
+
+    wrapper.setData({
+      operation_information: [mockOperation],
+      incremented_units: 10,
+    })
+
+    const mockApi = new FetchAPI()
+    mockApi.put.mockResolvedValueOnce({})
+
+    await wrapper.vm.updatePlannedUnits()
+
+    expect(mockApi.put).toHaveBeenCalledWith(`/api/update-units/${mockOperation.process_id}`, {
+      planned_number_units: 10,
+    })
+  })
+
+  it('fetches all operations successfully', async () => {
+    const mockOperations = [
+      { planned_number_units: 5, non_defective_products: 3 },
+      { planned_number_units: 10, non_defective_products: 8 },
+    ]
+
+    const mockApi = new FetchAPI()
+    mockApi.get.mockResolvedValueOnce({ success: true, data: mockOperations })
+
+    await wrapper.vm.fetchAllOperations()
+
+    expect(wrapper.vm.operation_information).toEqual(mockOperations)
+    expect(wrapper.vm.nonDefectiveProducts).toBe(8)
+  })
+
+  it('handles fetchAllOperations error', async () => {
+    const mockApi = new FetchAPI()
+    mockApi.get.mockRejectedValueOnce(new Error('API Error'))
+
+    await wrapper.vm.fetchAllOperations()
+
+    expect(console.error).toHaveBeenCalledWith(expect.any(Error))
+  })
+
+  it('covers condition in startIncrementer', () => {
+    jest.useFakeTimers()
+    wrapper.setData({ reference_CT: 1000, operation_information: [{ planned_number_units: 10 }] })
+    wrapper.vm.startIncrementer()
+    jest.advanceTimersByTime(1000)
+    expect(wrapper.vm.incremented_units).toBe(1)
+    jest.clearAllTimers()
+  })
+
+  it('calculates working time correctly', async () => {
+    wrapper.setData({ incremented_units: 10, nonDefectiveProducts: 8 })
+    await wrapper.vm.calculateWorkingTime()
+    expect(wrapper.vm.working_rate).toBe(80.0)
+  })
+})
