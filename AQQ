@@ -1,0 +1,105 @@
+<td
+  v-for="(cell, cellIndex) in row"
+  :key="cellIndex"
+  v-bind="cell.directives"
+  id="custom-row"
+  :style="cellIndex === CTColumnIndex ? getFacility(cell.value) : ''"
+>
+  <common-label
+    :item="{
+      ...cell,
+      cellIndex: cellIndex,
+      display: {
+        label: displayColumnLabel(cell, cellIndex),
+      },
+    }"
+  />
+</td>
+
+computed: {
+  CTColumnIndex() {
+    return this.itemTable.TABLE_HEADER.findIndex(
+      (header) => header.key === 'facility_cycle_time'
+    );
+  },
+},
+
+
+getFacility(CT) {
+  return {
+    background: CT > 2 ? 'red' : 'none',
+  };
+},
+-----------
+import { shallowMount } from '@vue/test-utils';
+import CommonTable from '@/components/CommonTable.vue';
+
+describe('CommonTable.vue', () => {
+  const itemTableMock = {
+    TABLE_HEADER: [
+      { key: 'name', label: 'Name' },
+      { key: 'facility_cycle_time', label: 'Cycle Time' },
+      { key: 'status', label: 'Status' },
+    ],
+  };
+
+  const rowsMock = [
+    [
+      { value: 'Product A', directives: {} },
+      { value: 3, directives: {} }, // Cycle Time
+      { value: 'Active', directives: {} },
+    ],
+    [
+      { value: 'Product B', directives: {} },
+      { value: 1, directives: {} }, // Cycle Time
+      { value: 'Inactive', directives: {} },
+    ],
+  ];
+
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = shallowMount(CommonTable, {
+      propsData: {
+        itemTable: itemTableMock,
+        rows: rowsMock,
+      },
+    });
+  });
+
+  afterEach(() => {
+    wrapper.destroy();
+  });
+
+  // Test for getFacility method
+  describe('getFacility method', () => {
+    it('returns a red background when CT > 2', () => {
+      const style = wrapper.vm.getFacility(3);
+      expect(style).toEqual({ background: 'red' });
+    });
+
+    it('returns no background when CT <= 2', () => {
+      const style = wrapper.vm.getFacility(2);
+      expect(style).toEqual({ background: 'none' });
+    });
+  });
+
+  // Test for CTColumnIndex computed property
+  describe('CTColumnIndex computed property', () => {
+    it('returns the correct index for facility_cycle_time', () => {
+      expect(wrapper.vm.CTColumnIndex).toBe(1); // 'facility_cycle_time' is at index 1
+    });
+
+    it('returns -1 if facility_cycle_time is not in TABLE_HEADER', () => {
+      wrapper.setProps({
+        itemTable: {
+          TABLE_HEADER: [
+            { key: 'name', label: 'Name' },
+            { key: 'status', label: 'Status' },
+          ],
+        },
+      });
+      expect(wrapper.vm.CTColumnIndex).toBe(-1);
+    });
+  });
+});
