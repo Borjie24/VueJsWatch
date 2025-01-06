@@ -1,0 +1,147 @@
+<template>
+  <v-table class="custom-table">
+    <thead>
+      <tr>
+        <th
+          v-show="itemTable.TABLE_HEADER.length != 0"
+          v-for="(column, columnIndex) in itemTable.TABLE_HEADER"
+          :key="columnIndex"
+          v-bind="column.directives"
+          id="custom-header"
+        >
+          <common-label :item="column" class="text-h5 font-weight-bold"></common-label>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr v-for="(row, rowIndex) in rows?.length ? rows : [itemTable.TABLE_COLUMN]" :key="rowIndex">
+        <td
+          v-for="(cell, cellIndex) in row"
+          :key="cellIndex"
+          v-bind="cell.directives"
+          id="custom-row"
+          :style="itemTable.TABLE_HEADER[cellIndex]?.key === 'facility_cycle_time' ? getFacility(cell.value) : ''"
+        >
+          <common-label
+            :item="{
+              ...cell,
+              cellIndex: cellIndex,
+              display: {
+                label: displayColumnLabel(cell, cellIndex),
+              },
+            }"
+          />
+        </td>
+      </tr>
+    </tbody>
+  </v-table>
+</template>
+
+<script>
+import CommonLabel from './CommonLabel.vue';
+
+export default {
+  name: 'CommonTable',
+  components: { CommonLabel },
+  props: {
+    itemTable: {
+      type: Object,
+      required: true,
+    },
+    rows: {
+      type: Array,
+    },
+    firstColumn: {
+      type: Object,
+    },
+    secondColumn: {
+      type: Object,
+    },
+    thirdColumn: {
+      type: Object,
+    },
+  },
+  methods: {
+    /**
+     * Generates the column labels
+     * @param {string} label - column value
+     * @param {int} columnIndex - column index
+     * @returns {string} column label
+     */
+    displayColumnLabel(label, columnIndex) {
+      const columns = [this.firstColumn, this.secondColumn, this.thirdColumn];
+      const column = columns[columnIndex];
+      if (column && (column.value || column.value > 0)) {
+        return `${column.value} ${column.symbol || ''}`;
+      }
+
+      let newLabel = typeof label === 'object' ? label.display.label : label;
+
+      return newLabel;
+    },
+
+    getFacility(CT) {
+      return {
+        background: CT > 2 ? 'red' : 'none',
+      };
+    },
+  },
+};
+</script>
+
+itemTable.TABLE_HEADER[cellIndex]?.key === 'facility_cycle_time'
+
+---
+
+import { shallowMount } from '@vue/test-utils';
+import CommonTable from '@/components/CommonTable.vue';
+
+describe('CommonTable.vue', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = shallowMount(CommonTable, {
+      propsData: {
+        itemTable: {
+          TABLE_HEADER: [],
+        },
+        rows: [],
+      },
+    });
+  });
+
+  afterEach(() => {
+    wrapper.destroy();
+  });
+
+  describe('getFacility method', () => {
+    it('returns a red background when CT > 2', () => {
+      const style = wrapper.vm.getFacility(3);
+      expect(style).toEqual({ background: 'red' });
+    });
+
+    it('returns no background when CT <= 2', () => {
+      const style = wrapper.vm.getFacility(2);
+      expect(style).toEqual({ background: 'none' });
+    });
+
+    it('returns no background when CT is 0 or negative', () => {
+      const style = wrapper.vm.getFacility(0);
+      expect(style).toEqual({ background: 'none' });
+
+      const negativeStyle = wrapper.vm.getFacility(-1);
+      expect(negativeStyle).toEqual({ background: 'none' });
+    });
+
+    it('handles invalid or undefined input gracefully', () => {
+      const undefinedStyle = wrapper.vm.getFacility(undefined);
+      expect(undefinedStyle).toEqual({ background: 'none' });
+
+      const nullStyle = wrapper.vm.getFacility(null);
+      expect(nullStyle).toEqual({ background: 'none' });
+
+      const nonNumericStyle = wrapper.vm.getFacility('invalid');
+      expect(nonNumericStyle).toEqual({ background: 'none' });
+    });
+  });
+});
