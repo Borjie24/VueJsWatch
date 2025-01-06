@@ -1,0 +1,19 @@
+<td
+  v-for="(cell, cellIndex) in row"
+  :key="cellIndex"
+  v-bind="cell.directives"
+  id="custom-row"
+  :style="itemTable.TABLE_HEADER[cellIndex]?.key === 'facility_cycle_time' ? getFacility(cell.value) : ''"
+>
+  <common-label
+    :item="{
+      ...cell,
+      cellIndex: cellIndex,
+      display: {
+        label: itemTable.TABLE_HEADER[cellIndex]?.key === 'facility_cycle_time' 
+          ? `${cell.value}s` 
+          : displayColumnLabel(cell, cellIndex),
+      },
+    }"
+  />
+</td>
