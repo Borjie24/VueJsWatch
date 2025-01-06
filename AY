@@ -1,0 +1,46 @@
+getProductNumber() {
+  const operation_information = this.operation_information;
+  const defaultFill = '0000';
+
+  const map = operation_information.map((filObj) => {
+    // Check if the product number is 5 digits
+    if (String(filObj.product_number).length === 5) {
+      return '9999';
+    }
+    // Otherwise, pad the number
+    return (defaultFill + filObj.product_number).substr(-4);
+  });
+
+  this.product_number = map;
+},
+
+------
+import { shallowMount } from '@vue/test-utils';
+import YourComponent from '@/path/to/YourComponent.vue';
+
+describe('getProductNumber', () => {
+  it('should return the correct padded or replaced product numbers', () => {
+    // Mock data for operation_information
+    const mockOperationInformation = [
+      { product_number: 123 },   // 3 digits, should be padded
+      { product_number: 4567 }, // 4 digits, should be padded
+      { product_number: 12345 } // 5 digits, should be replaced with '9999'
+    ];
+
+    // Mount the component
+    const wrapper = shallowMount(YourComponent, {
+      data() {
+        return {
+          operation_information: mockOperationInformation,
+          product_number: []
+        };
+      }
+    });
+
+    // Call the method
+    wrapper.vm.getProductNumber();
+
+    // Assert the results
+    expect(wrapper.vm.product_number).toEqual(['0123', '4567', '9999']);
+  });
+});
