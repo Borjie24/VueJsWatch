@@ -1,0 +1,28 @@
+from flask import Flask, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///example.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+class Item(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Create the database
+with app.app_context():
+    db.create_all()
+----------------------
+@app.route('/oldest-items', methods=['GET'])
+def get_oldest_items():
+    # Query the oldest 2 items ordered by created_at ascending
+    oldest_items = Item.query.order_by(Item.created_at.asc()).limit(2).all()
+    # Convert the items to a dictionary for JSON response
+    result = [
+        {"id": item.id, "name": item.name, "created_at": item.created_at.isoformat()}
+        for item in oldest_items
+    ]
+    return jsonify(result)
