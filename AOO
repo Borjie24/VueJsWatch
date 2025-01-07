@@ -1,0 +1,70 @@
+describe('Testing ProcessInformationScreen.vue', () => {
+  const wrapper = shallowMount(ProcessInformationScreen, {
+    global: {
+      components: {
+        VContainer: 'v-container',
+        VCol: 'v-col',
+        VRow: 'v-row',
+      },
+    },
+    data() {
+      return {
+        reference_CT: 0,
+        operationInformation: [],
+        incremented_units: 0,
+        incrementInterval: null,
+        nonDefectiveProducts: 0,
+        working_rate: 0,
+        operation_table: [],
+      }
+    },
+  });
+
+  // Existing tests remain untouched...
+
+  it('formats product numbers correctly', () => {
+    expect(wrapper.vm.formatProductNumber(123)).toBe('0123'); // Pads to 4 digits
+    expect(wrapper.vm.formatProductNumber(4567)).toBe('4567'); // Already 4 digits
+    expect(wrapper.vm.formatProductNumber(12345)).toBe('9999'); // 5 digits replaced with '9999'
+  });
+
+  it('maps operationInformation correctly in getOperationTable', () => {
+    // Mock operationInformation data
+    const mockOperationInformation = [
+      {
+        process_id: 1,
+        process_name: 'Process A',
+        product_number: 123,
+        facility_cycle_time: 15.6789,
+      },
+      {
+        process_id: 2,
+        process_name: 'Process B',
+        product_number: 12345,
+        facility_cycle_time: 20.1234,
+      },
+    ];
+
+    // Set mock data
+    wrapper.setData({ operationInformation: mockOperationInformation });
+
+    // Call getOperationTable
+    wrapper.vm.getOperationTable();
+
+    // Assert the operation_table result
+    expect(wrapper.vm.operation_table).toEqual([
+      {
+        process_id: 1,
+        process_name: 'Process A',
+        product_number: '0123', // Padded to 4 digits
+        facility_cycle_time: '15.68', // Rounded to 2 decimal places
+      },
+      {
+        process_id: 2,
+        process_name: 'Process B',
+        product_number: '9999', // 5 digits replaced with '9999'
+        facility_cycle_time: '20.12', // Rounded to 2 decimal places
+      },
+    ]);
+  });
+});
