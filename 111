@@ -1,0 +1,109 @@
+@replenishment_notice_router.route("/api/get-abnormalities", methods=["GET"])
+def get_abnormalities():
+    """Fetch abnormalities
+
+    Returns:
+        dict: return the API response
+    """
+    # Fetch the data from the database
+    query = (
+        ReplenishmentDb.query.order_by(ReplenishmentDb.setup_date_time.asc())
+        .limit(14)
+        .all()
+    )
+
+    # Deserialize the query results
+    abnormalities = replenishment_notice_schema(many=True).dump(query)
+
+    # Filter and transform the data using list comprehension
+    abnormalities_data = [
+        {
+            "process_name": item["operation_details"]["process_name"],
+            "error_code": item["abnormalities_content"]["error_code"],
+            "error_message": item["abnormalities_content"]["error_message"],
+        }
+        for item in abnormalities
+        if item["operation_details"]["operation_status"] == 3
+    ]
+
+    # Return the API response
+    return {
+        "success": True,
+        "message_response": "ABNORMALITIES FETCHED SUCCESSFULLY",
+        "message_content": "Abnormalities fetched successfully",
+        "data": abnormalities_data,
+    }, 200
+--------------------------
+
+def test_get_abnormalities(self):
+    """Test if the get_abnormalities successfully fetches data with operation_status=3
+    and excludes data with operation_status != 3.
+    """
+    # Mock data for operation_status=3
+    mock_coordinates_1 = CoordinatesDb(
+        x_position=65, y_position=515, width=70, height=40
+    )
+    mock_operation_information_1 = OperationInformationDb(
+        process_name="部品供給機",
+        operation_status=3,  # Valid status for abnormalities
+        planned_number_units=24,
+        non_defective_products=23,
+        product_number=2,
+        facility_cycle_time=2,
+        coordinates_id=1,
+    )
+    mock_abnormalities_1 = AbnormalitiesDb(
+        error_code="エラー1-01", error_message="異常停止経過時間"
+    )
+    mock_replenishment_notice_1 = ReplenishmentDb(
+        setup_date_time="2025-01-07 10:23:54", process_id=1, abnormalities_id=1
+    )
+
+    # Mock data for operation_status!=3
+    mock_coordinates_2 = CoordinatesDb(
+        x_position=70, y_position=520, width=75, height=45
+    )
+    mock_operation_information_2 = OperationInformationDb(
+        process_name="異常供給機",
+        operation_status=1,  # Invalid status for abnormalities
+        planned_number_units=30,
+        non_defective_products=28,
+        product_number=3,
+        facility_cycle_time=3,
+        coordinates_id=2,
+    )
+    mock_abnormalities_2 = AbnormalitiesDb(
+        error_code="エラー2-02", error_message="軽微な異常"
+    )
+    mock_replenishment_notice_2 = ReplenishmentDb(
+        setup_date_time="2025-01-07 12:00:00", process_id=2, abnormalities_id=2
+    )
+
+    # Add all mock data to the session
+    db.session.add_all(
+        [
+            mock_coordinates_1,
+            mock_operation_information_1,
+            mock_abnormalities_1,
+            mock_replenishment_notice_1,
+            mock_coordinates_2,
+            mock_operation_information_2,
+            mock_abnormalities_2,
+            mock_replenishment_notice_2,
+        ]
+    )
+    db.session.commit()
+
+    # Make the API call
+    get_response = self.client.get("/api/get-abnormalities")
+    data = get_response.get_json()
+
+    # Assertions
+    assert get_response.status_code == 200
+    assert data["message_response"] == "ABNORMALITIES FETCHED SUCCESSFULLY"
+
+    # Verify only data with operation_status=3 is returned
+    assert len(data["data"]) == 1
+    assert data["data"][0]["process_name"] == "部品供給機"
+    assert data["data"][0]["error_code"] == "エラー1-01"
+    assert data["data"][0]["error_message"] == "異常停止経過時間"
