@@ -1,0 +1,111 @@
+<template>
+  <v-container fluid>
+    <v-row>
+      <v-col>
+        <!-- Conditionally render components based on the toggle -->
+        <ProcessChart
+          v-if="showProcessChart"
+          :incremented-units="incremented_units"
+          :non-defective-products="nonDefectiveProducts"
+          :working-rate="working_rate"
+          :operationInformation="operation_table"
+        />
+        <Abnormal
+          v-else
+          :incremented-units="incremented_units"
+          :non-defective-products="nonDefectiveProducts"
+          :working-rate="working_rate"
+          :operationInformation="operation_table"
+        />
+      </v-col>
+    </v-row>
+  </v-container>
+</template>
+
+<script>
+import ProcessChart from './ProcessInformationScreen/ProcessChart.vue';
+import Abnormal from './ProcessInformationScreen/Abnormal.vue';
+import { FetchAPI } from '@/utility/apiRequest';
+
+export default {
+  name: 'ProcessInformationScreen',
+  components: {
+    ProcessChart,
+    Abnormal,
+  },
+  data() {
+    return {
+      reference_CT: 0,
+      operationInformation: [],
+      incremented_units: 0,
+      incrementInterval: null,
+      nonDefectiveProducts: 0,
+      working_rate: 0,
+      operation_table: [],
+      showProcessChart: true, // Toggle between ProcessChart and Abnormal
+      toggleInterval: null, // Interval ID for toggling
+    };
+  },
+  async mounted() {
+    await this.fetchAllOperations();
+    await this.fetchReferenceCT();
+    this.startToggleInterval(); // Start toggling between components
+  },
+  beforeUnmount() {
+    this.clearToggleInterval(); // Clear interval on unmount
+  },
+  methods: {
+    /**
+     * Starts the interval to toggle between ProcessChart and Abnormal
+     */
+    startToggleInterval() {
+      this.toggleInterval = setInterval(() => {
+        this.showProcessChart = !this.showProcessChart; // Toggle the state
+      }, 7000); // 7 seconds
+    },
+    /**
+     * Clears the toggle interval
+     */
+    clearToggleInterval() {
+      if (this.toggleInterval) {
+        clearInterval(this.toggleInterval);
+      }
+    },
+    /**
+     * Retrieves all operation information
+     */
+    async fetchAllOperations() {
+      try {
+        const api = new FetchAPI();
+        const response = await api.get('/api/get-all-operations');
+        this.operationInformation = [...response.data];
+        this.nonDefectiveProducts =
+          this.operationInformation[this.operationInformation.length - 1]
+            .non_defective_products;
+        this.initializeIncrementer();
+        this.getOperationTable();
+      } catch (error) {
+        console.log(error);
+      }
+    },
+    /**
+     * Retrieves the reference cycle time
+     */
+    async fetchReferenceCT() {
+      try {
+        const api = new FetchAPI();
+        const response = await api.get('/api/get-ref-cycle-time');
+
+        if (response.success) {
+          let ref_CT = response.data[0].reference_cycle_time * 1000;
+          this.reference_CT = ref_CT || 2000;
+          this.restartIncrementer();
+        }
+      } catch (error) {
+        console.log(error);
+      }
+    },
+    // Other methods remain unchanged...
+  },
+};
+</script>
