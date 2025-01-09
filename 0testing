@@ -1,0 +1,105 @@
+<template>
+  <v-app>
+    <v-container>
+      <v-text-field v-if="showTextField" v-model="msg" />
+      <v-checkbox v-else label="Checkbox"></v-checkbox>
+      <p>Switching in: {{ countdown }} seconds</p>
+    </v-container>
+  </v-app>
+</template>
+
+<script setup>
+  import { ref, onMounted, onBeforeUnmount } from 'vue'
+
+  // Reactive state
+  const msg = ref('Hello World!')
+  const showTextField = ref(true) // Controls the visibility
+  const countdown = ref(7) // Countdown timer
+  let intervalId
+
+  // Methods
+  const methods = {
+    toggleDisplay() {
+      showTextField.value = !showTextField.value
+      countdown.value = 7 // Reset countdown
+    },
+  }
+
+  // Lifecycle hooks
+  onMounted(() => {
+    intervalId = setInterval(() => {
+      if (countdown.value > 0) {
+        countdown.value -= 1 // Decrement countdown
+      } else {
+        methods.toggleDisplay() // Toggle display when countdown reaches 0
+      }
+    }, 1000) // 1-second interval
+  })
+
+  onBeforeUnmount(() => {
+    clearInterval(intervalId)
+  })
+</script>
+----------------------------
+
+import { shallowMount } from '@vue/test-utils';
+import App from '@/components/App.vue'; // Adjust the path to your component
+
+jest.useFakeTimers(); // Use Jest's fake timers
+
+describe('App.vue', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = shallowMount(App);
+  });
+
+  afterEach(() => {
+    wrapper.unmount();
+  });
+
+  test('should toggle display between v-text-field and v-checkbox', () => {
+    // Initially, showTextField should be true
+    expect(wrapper.vm.showTextField).toBe(true);
+
+    // Simulate the countdown reaching 0
+    jest.advanceTimersByTime(7000);
+
+    // After 7 seconds, showTextField should toggle to false
+    expect(wrapper.vm.showTextField).toBe(false);
+
+    // Simulate another 7 seconds
+    jest.advanceTimersByTime(7000);
+
+    // After another 7 seconds, showTextField should toggle back to true
+    expect(wrapper.vm.showTextField).toBe(true);
+  });
+
+  test('should decrement countdown every second', () => {
+    // Countdown should start at 7
+    expect(wrapper.vm.countdown).toBe(7);
+
+    // Simulate 3 seconds
+    jest.advanceTimersByTime(3000);
+
+    // Countdown should now be 4
+    expect(wrapper.vm.countdown).toBe(4);
+
+    // Simulate another 4 seconds
+    jest.advanceTimersByTime(4000);
+
+    // Countdown should reset to 7 after reaching 0
+    expect(wrapper.vm.countdown).toBe(7);
+  });
+
+  test('should clear interval on component unmount', () => {
+    // Spy on clearInterval
+    const clearIntervalSpy = jest.spyOn(global, 'clearInterval');
+
+    // Unmount the component
+    wrapper.unmount();
+
+    // Ensure clearInterval was called
+    expect(clearIntervalSpy).toHaveBeenCalled();
+  });
+});
