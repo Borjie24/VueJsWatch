@@ -106,6 +106,70 @@ export default {
       }
     },
     // Other methods remain unchanged...
+
+--------------
+import { shallowMount } from '@vue/test-utils';
+import ProcessInformationScreen from '@/components/ProcessInformationScreen.vue';
+
+jest.useFakeTimers(); // Use Jest's fake timers to control the setInterval and clearInterval behavior
+
+describe('ProcessInformationScreen.vue', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = shallowMount(ProcessInformationScreen);
+  });
+
+  afterEach(() => {
+    wrapper.unmount();
+  });
+
+  test('startToggleInterval should toggle showProcessChart every 7 seconds', () => {
+    // Initially, showProcessChart is true
+    expect(wrapper.vm.showProcessChart).toBe(true);
+
+    // Call startToggleInterval
+    wrapper.vm.startToggleInterval();
+
+    // Fast-forward time by 7 seconds
+    jest.advanceTimersByTime(7000);
+
+    // Expect the toggle to have occurred
+    expect(wrapper.vm.showProcessChart).toBe(false);
+
+    // Fast-forward another 7 seconds
+    jest.advanceTimersByTime(7000);
+
+    // Expect the toggle to occur again
+    expect(wrapper.vm.showProcessChart).toBe(true);
+  });
+
+  test('clearToggleInterval should clear the interval', () => {
+    // Start the interval
+    wrapper.vm.startToggleInterval();
+
+    // Clear the interval
+    wrapper.vm.clearToggleInterval();
+
+    // Fast-forward time by 7 seconds
+    jest.advanceTimersByTime(7000);
+
+    // Expect no change in the toggle state since the interval was cleared
+    expect(wrapper.vm.showProcessChart).toBe(true);
+  });
+
+  test('beforeUnmount should clear the interval', () => {
+    // Spy on clearToggleInterval to ensure it gets called
+    const clearToggleIntervalSpy = jest.spyOn(wrapper.vm, 'clearToggleInterval');
+
+    // Trigger beforeUnmount
+    wrapper.unmount();
+
+    // Ensure clearToggleInterval was called
+    expect(clearToggleIntervalSpy).toHaveBeenCalled();
+  });
+});
+
   },
 };
 </script>
