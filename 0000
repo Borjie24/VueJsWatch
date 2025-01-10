@@ -1,0 +1,116 @@
+<template>
+  <v-container class="container" fluid>
+    <v-row class="ProductLineHeader">
+      <common-label :item="ErrorInformationTitle" />
+    </v-row>
+
+    <v-row>
+      <v-col class="error-screen">
+        <v-list
+          v-for="(item, index) in abnormalities"
+          :key="item.id"
+          :style="{ transform: getTransform(index) }"
+          :class="{ 'zoomed-item': currentZoomedIndex === index }"
+          class="zoom-item"
+          style="background-color: cadetblue; margin: 0; padding: 5px"
+        >
+          <v-list-item-title
+            class="v-list-item-title"
+            style="background-color: royalblue; margin: 0; padding: 0"
+          >
+            <span>
+              <span class="replenish-number">{{ index + 1 }} </span>
+              {{ item.process_name }} {{ item.error_code }} {{ item.error_message }}
+            </span>
+          </v-list-item-title>
+        </v-list>
+      </v-col>
+    </v-row>
+  </v-container>
+</template>
+
+<script>
+import CommonLabel from '@/components/common/CommonLabel.vue'
+import { ERROR_INFORMATION_LABEL } from '@/common/recipe/rLabels'
+
+export default {
+  name: 'ErrorInformation',
+  components: {
+    CommonLabel,
+  },
+  props: {
+    abnormalities: {
+      type: Array,
+      required: true,
+    },
+  },
+  data() {
+    return {
+      ErrorInformationTitle: ERROR_INFORMATION_LABEL,
+      currentZoomedIndex: -1,
+      isAnimating: true,
+      animationTimeout: null,
+      pauseTimeout: null,
+      debouncedHandleResize: null,
+    }
+  },
+  methods: {
+    getTransform(index) {
+      return this.currentZoomedIndex === index ? 'scale(1.2)' : 'scale(1)'
+    },
+    animateItem(index) {
+      if (!this.isAnimating) return
+
+      this.currentZoomedIndex = index
+
+      this.animationTimeout = setTimeout(() => {
+        this.currentZoomedIndex = -1
+
+        // Move to the next item
+        const nextIndex = (index + 1) % this.abnormalities.length
+
+        // Set pause duration based on the index
+        const pauseDuration = nextIndex % 7 === 0 ? 7000 : 500
+
+        this.pauseTimeout = setTimeout(() => {
+          this.animateItem(nextIndex)
+        }, pauseDuration)
+      }, 500)
+    },
+    handleResize() {
+      if (window.innerWidth >= 768) {
+        this.isAnimating = false
+        clearTimeout(this.animationTimeout)
+        clearTimeout(this.pauseTimeout)
+        this.currentZoomedIndex = -1
+      } else {
+        this.isAnimating = true
+        this.animateItem(0)
+      }
+    },
+    debounce(func, delay) {
+      let timeout
+      return (...args) => {
+        clearTimeout(timeout)
+        timeout = setTimeout(() => func.apply(this, args), delay)
+      }
+    },
+    setupListeners() {
+      this.debouncedHandleResize = this.debounce(this.handleResize, 200)
+      window.addEventListener('resize', this.debouncedHandleResize)
+      if (window.innerWidth < 768) this.animateItem(0)
+    },
+    cleanupListeners() {
+      window.removeEventListener('resize', this.debouncedHandleResize)
+      clearTimeout(this.animationTimeout)
+      clearTimeout(this.pauseTimeout)
+    },
+  },
+  mounted() {
+    this.setupListeners()
+  },
+  beforeUnmount() {
+    this.cleanupListeners()
+  },
+}
+</script>
