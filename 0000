@@ -114,3 +114,82 @@ export default {
   },
 }
 </script>
+
+import { mount } from '@vue/test-utils';
+import ErrorInformation from '@/components/ErrorInformation.vue';
+import CommonLabel from '@/components/common/CommonLabel.vue';
+
+jest.useFakeTimers();
+
+describe('ErrorInformation.vue', () => {
+  const abnormalitiesMock = [
+    { id: 1, process_name: 'Process 1', error_code: 'E01', error_message: 'Error 1' },
+    { id: 2, process_name: 'Process 2', error_code: 'E02', error_message: 'Error 2' },
+  ];
+
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = mount(ErrorInformation, {
+      props: {
+        abnormalities: abnormalitiesMock,
+      },
+      global: {
+        components: { CommonLabel },
+      },
+    });
+  });
+
+  afterEach(() => {
+    wrapper.unmount();
+  });
+
+  it('renders the CommonLabel component with the correct title', () => {
+    const commonLabel = wrapper.findComponent(CommonLabel);
+    expect(commonLabel.exists()).toBe(true);
+    expect(commonLabel.props('item')).toBe(wrapper.vm.ErrorInformationTitle);
+  });
+
+  it('renders the list of abnormalities correctly', () => {
+    const listItems = wrapper.findAll('.zoom-item');
+    expect(listItems.length).toBe(abnormalitiesMock.length);
+    expect(listItems[0].text()).toContain('Process 1');
+    expect(listItems[1].text()).toContain('Process 2');
+  });
+
+  it('animates items when the screen width is less than 768px', async () => {
+    global.innerWidth = 500; // Simulate a small screen
+    wrapper.vm.handleResize();
+    jest.advanceTimersByTime(500); // Simulate animation timeout
+    expect(wrapper.vm.currentZoomedIndex).toBe(0);
+
+    jest.advanceTimersByTime(500); // Move to the next item
+    expect(wrapper.vm.currentZoomedIndex).toBe(-1);
+  });
+
+  it('stops animation when the screen width is greater than or equal to 768px', async () => {
+    global.innerWidth = 800; // Simulate a large screen
+    wrapper.vm.handleResize();
+    expect(wrapper.vm.isAnimating).toBe(false);
+    expect(wrapper.vm.currentZoomedIndex).toBe(-1);
+  });
+
+  it('calls setupListeners on mount', () => {
+    const setupListenersSpy = jest.spyOn(wrapper.vm, 'setupListeners');
+    wrapper.vm.$options.mounted[0].call(wrapper.vm); // Call mounted hook manually
+    expect(setupListenersSpy).toHaveBeenCalled();
+  });
+
+  it('calls cleanupListeners on beforeUnmount', () => {
+    const cleanupListenersSpy = jest.spyOn(wrapper.vm, 'cleanupListeners');
+    wrapper.vm.$options.beforeUnmount[0].call(wrapper.vm); // Call beforeUnmount hook manually
+    expect(cleanupListenersSpy).toHaveBeenCalled();
+  });
+
+  it('cleans up timeouts on unmount', () => {
+    wrapper.vm.animationTimeout = setTimeout(() => {}, 1000);
+    wrapper.vm.pauseTimeout = setTimeout(() => {}, 1000);
+    wrapper.unmount();
+    expect(clearTimeout).toHaveBeenCalledTimes(2);
+  });
+});
