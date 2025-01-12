@@ -1,0 +1,199 @@
+<template>
+  <v-container class="container" fluid>
+    <v-row class="ProductLineHeader"> <common-label :item="ErrorInformationTitle" /> </v-row>
+
+    <v-row>
+      <v-col class="error-screen">
+        <v-list
+          v-for="(item, index) in abnormalities"
+          :key="item.id"
+          :style="{ transform: getTransform(index) }"
+          :class="{ 'zoomed-item': currentZoomedIndex === index }"
+          class="zoom-item"
+          style="background-color: cadetblue; margin: 0; padding: 5px"
+        >
+          <v-list-item-title
+            class="v-list-item-title"
+            style="background-color: royalblue; margin: 0; padding: 0"
+          >
+            <span>
+              <span class="replenish-number">{{ index + 1 }} </span>
+              {{ item.process_name }} {{ item.error_code }} {{ item.error_message }}
+            </span>
+          </v-list-item-title>
+        </v-list>
+      </v-col>
+    </v-row>
+  </v-container>
+</template>
+
+<script>
+import CommonLabel from "@/components/common/CommonLabel.vue";
+import { ERROR_INFORMATION_LABEL } from "@/common/recipe/rLabels";
+
+export default {
+  name: "ErrorInformation",
+  components: {
+    CommonLabel,
+  },
+  props: {
+    abnormalities: {
+      type: Array,
+      required: true,
+    },
+  },
+  data() {
+    return {
+      ErrorInformationTitle: ERROR_INFORMATION_LABEL,
+      currentZoomedIndex: -1,
+      isAnimating: true,
+      animationTimeout: null,
+      pauseTimeout: null,
+    };
+  },
+  methods: {
+    getTransform(index) {
+      return this.currentZoomedIndex === index ? "scale(1.2)" : "scale(1)";
+    },
+    animateItem(index) {
+      if (!this.isAnimating) return;
+
+      this.currentZoomedIndex = index;
+
+      this.animationTimeout = setTimeout(() => {
+        this.currentZoomedIndex = -1;
+
+        const nextIndex = (index + 1) % this.abnormalities.length;
+
+        // Determine pause duration based on the current group
+        const groupIndex = Math.floor(nextIndex / 7);
+        const pauseDuration = (nextIndex % 7 === 0 && groupIndex > 0) ? 7000 : 500;
+
+        this.pauseTimeout = setTimeout(() => {
+          this.animateItem(nextIndex);
+        }, pauseDuration);
+      }, 500);
+    },
+    handleResize() {
+      if (window.innerWidth >= 768) {
+        this.isAnimating = false;
+        clearTimeout(this.animationTimeout);
+        clearTimeout(this.pauseTimeout);
+        this.currentZoomedIndex = -1;
+      } else {
+        this.isAnimating = true;
+        this.animateItem(0);
+      }
+    },
+    debounce(func, delay) {
+      let timeout;
+      return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
+      };
+    },
+  },
+  mounted() {
+    this.debouncedHandleResize = this.debounce(this.handleResize, 200);
+    window.addEventListener("resize", this.debouncedHandleResize);
+
+    if (window.innerWidth < 768) {
+      this.animateItem(0);
+    }
+  },
+  beforeUnmount() {
+    window.removeEventListener("resize", this.debouncedHandleResize);
+    clearTimeout(this.animationTimeout);
+    clearTimeout(this.pauseTimeout);
+  },
+};
+</script>
+---------------------------
+import { shallowMount } from "@vue/test-utils";
+import ErrorInformation from "@/components/ErrorInformation.vue";
+
+jest.useFakeTimers();
+
+describe("ErrorInformation.vue", () => {
+  let wrapper;
+
+  const mockAbnormalities = [
+    { id: 1, process_name: "Process 1", error_code: "E1", error_message: "Error 1" },
+    { id: 2, process_name: "Process 2", error_code: "E2", error_message: "Error 2" },
+    { id: 3, process_name: "Process 3", error_code: "E3", error_message: "Error 3" },
+    // Add more items as needed for testing
+  ];
+
+  beforeEach(() => {
+    wrapper = shallowMount(ErrorInformation, {
+      props: { abnormalities: mockAbnormalities },
+    });
+  });
+
+  afterEach(() => {
+    wrapper.unmount();
+  });
+
+  it("renders the list of abnormalities", () => {
+    const listItems = wrapper.findAll("v-list");
+    expect(listItems).toHaveLength(mockAbnormalities.length);
+    mockAbnormalities.forEach((item, index) => {
+      expect(listItems.at(index).text()).toContain(item.process_name);
+      expect(listItems.at(index).text()).toContain(item.error_code);
+      expect(listItems.at(index).text()).toContain(item.error_message);
+    });
+  });
+
+  it("animates items and pauses after every 7 items", async () => {
+    wrapper.vm.animateItem(0);
+
+    // Check the first item is zoomed
+    expect(wrapper.vm.currentZoomedIndex).toBe(0);
+
+    // Fast-forward the animation timeout
+    jest.advanceTimersByTime(500);
+
+    // Check the zoom resets and moves to the next item
+    expect(wrapper.vm.currentZoomedIndex).toBe(-1);
+
+    // Simulate pause duration for item 7
+    wrapper.vm.animateItem(6); // Start at the 7th item
+    jest.advanceTimersByTime(500);
+    jest.advanceTimersByTime(7000); // 7-second pause
+    expect(wrapper.vm.currentZoomedIndex).toBe(-1);
+
+    // Check looping logic
+    wrapper.vm.animateItem(mockAbnormalities.length - 1); // Last item
+    jest.advanceTimersByTime(500);
+    expect(wrapper.vm.currentZoomedIndex).toBe(-1);
+  });
+
+  it("handles resize events correctly", () => {
+    // Mock window size
+    global.innerWidth = 1024;
+
+    // Trigger resize
+    wrapper.vm.handleResize();
+
+    // Ensure animation stops on larger screens
+    expect(wrapper.vm.isAnimating).toBe(false);
+    expect(wrapper.vm.currentZoomedIndex).toBe(-1);
+
+    // Simulate smaller screen
+    global.innerWidth = 500;
+    wrapper.vm.handleResize();
+
+    // Ensure animation resumes
+    expect(wrapper.vm.isAnimating).toBe(true);
+  });
+
+  it("cleans up timeouts and event listeners on unmount", () => {
+    const clearTimeoutSpy = jest.spyOn(global, "clearTimeout");
+    const removeEventListenerSpy = jest.spyOn(window, "removeEventListener");
+
+    wrapper.unmount();
+
+    expect(clearTimeoutSpy).toHaveBeenCalledTimes(2); // animationTimeout and pauseTimeout
+    expect(removeEventListenerSpy).toHaveBeenCalledWith("resize", expect.any(Function));
+  });
+});
