@@ -1,0 +1,229 @@
+<template>
+  <v-container class="container" fluid>
+    <v-row class="ProductLineHeader">
+      <common-label :item="ErrorInformationTitle" />
+    </v-row>
+
+    <v-row>
+      <v-col class="error-screen">
+        <v-list
+          v-for="(item, index) in abnormalities"
+          :key="item.id"
+          :style="{ transform: getTransform(index) }"
+          :class="{ 'zoomed-item': currentZoomedIndex === index }"
+          class="zoom-item"
+          style="background-color: cadetblue; margin: 0; padding: 5px"
+        >
+          <v-list-item-title
+            class="v-list-item-title"
+            style="background-color: royalblue; margin: 0; padding: 0"
+          >
+            <span>
+              <span class="replenish-number">{{ index + 1 }}</span>
+              {{ item.process_name }} {{ item.error_code }} {{ item.error_message }}
+            </span>
+          </v-list-item-title>
+        </v-list>
+      </v-col>
+    </v-row>
+  </v-container>
+</template>
+
+<script>
+import CommonLabel from '@/components/common/CommonLabel.vue';
+import { ERROR_INFORMATION_LABEL } from '@/common/recipe/rLabels';
+
+export default {
+  name: 'ErrorInformation',
+  components: {
+    CommonLabel,
+  },
+  data() {
+    return {
+      ErrorInformationTitle: ERROR_INFORMATION_LABEL,
+      items: [],
+      currentZoomedIndex: -1,
+      isAnimating: true,
+      animationTimeout: null,
+      pauseTimeout: null,
+    };
+  },
+  props: {
+    abnormalities: {
+      type: Array,
+      required: true,
+    },
+  },
+  methods: {
+    getTransform(index) {
+      return this.currentZoomedIndex === index ? 'scale(1.2)' : 'scale(1)';
+    },
+    animateItem(index) {
+      if (!this.isAnimating) return;
+
+      this.currentZoomedIndex = index;
+      const item = this.items[index];
+
+      this.animationTimeout = setTimeout(() => {
+        this.currentZoomedIndex = -1;
+
+        const nextIndex = (index + 1) % this.items.length;
+        const pauseDuration = nextIndex % 7 === 0 ? 7000 : 500;
+
+        this.pauseTimeout = setTimeout(() => {
+          this.animateItem(nextIndex);
+        }, pauseDuration);
+      }, 500);
+    },
+    handleResize() {
+      if (window.innerWidth >= 768) {
+        this.isAnimating = false;
+        clearTimeout(this.animationTimeout);
+        clearTimeout(this.pauseTimeout);
+        this.currentZoomedIndex = -1;
+      } else {
+        this.isAnimating = true;
+        this.animateItem(0);
+      }
+    },
+    debounce(func, delay) {
+      let timeout;
+      return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
+      };
+    },
+  },
+  mounted() {
+    this.debouncedHandleResize = this.debounce(this.handleResize, 200);
+    window.addEventListener('resize', this.debouncedHandleResize);
+
+    if (window.innerWidth < 768) {
+      this.animateItem(0);
+    }
+  },
+  beforeUnmount() {
+    window.removeEventListener('resize', this.debouncedHandleResize);
+    clearTimeout(this.animationTimeout);
+    clearTimeout(this.pauseTimeout);
+  },
+};
+</script>
+
+<style scoped>
+.replenish-number {
+  border: 0.125rem solid red;
+  border-radius: 50%;
+  padding: 0.2rem;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: inline-block;
+  width: 3.9ch;
+  aspect-ratio: 1 / 1;
+}
+
+.error-screen {
+  height: 530px;
+  background-color: #616161;
+  padding: 10px;
+}
+</style>
+---------------------------
+import { shallowMount } from '@vue/test-utils';
+import ErrorInformation from '@/components/ErrorInformation.vue';
+import CommonLabel from '@/components/common/CommonLabel.vue';
+
+describe('ErrorInformation.vue', () => {
+  let wrapper;
+
+  const mockAbnormalities = [
+    {
+      id: 1,
+      process_name: 'Process A',
+      error_code: 'E001',
+      error_message: 'Error Message A',
+    },
+    {
+      id: 2,
+      process_name: 'Process B',
+      error_code: 'E002',
+      error_message: 'Error Message B',
+    },
+  ];
+
+  beforeEach(() => {
+    wrapper = shallowMount(ErrorInformation, {
+      propsData: {
+        abnormalities: mockAbnormalities,
+      },
+      stubs: {
+        CommonLabel,
+      },
+    });
+  });
+
+  afterEach(() => {
+    wrapper.destroy();
+  });
+
+  it('renders the CommonLabel component with the correct title', () => {
+    const label = wrapper.findComponent(CommonLabel);
+    expect(label.exists()).toBe(true);
+    expect(label.props('item')).toBe(wrapper.vm.ErrorInformationTitle);
+  });
+
+  it('renders the list of abnormalities', () => {
+    const listItems = wrapper.findAll('.zoom-item');
+    expect(listItems.length).toBe(mockAbnormalities.length);
+
+    listItems.wrappers.forEach((itemWrapper, index) => {
+      const abnormality = mockAbnormalities[index];
+      expect(itemWrapper.text()).toContain(abnormality.process_name);
+      expect(itemWrapper.text()).toContain(abnormality.error_code);
+      expect(itemWrapper.text()).toContain(abnormality.error_message);
+    });
+  });
+
+  it('applies the correct transform based on the zoom index', async () => {
+    wrapper.setData({ currentZoomedIndex: 0 });
+    await wrapper.vm.$nextTick();
+
+    const firstItem = wrapper.findAll('.zoom-item').at(0);
+    expect(firstItem.attributes('style')).toContain('transform: scale(1.2)');
+
+    const secondItem = wrapper.findAll('.zoom-item').at(1);
+    expect(secondItem.attributes('style')).toContain('transform: scale(1)');
+  });
+
+  it('animates items when window width is less than 768px', async () => {
+    global.innerWidth = 500;
+    global.dispatchEvent(new Event('resize'));
+
+    const spyAnimateItem = jest.spyOn(wrapper.vm, 'animateItem');
+    wrapper.vm.handleResize();
+
+    expect(wrapper.vm.isAnimating).toBe(true);
+    expect(spyAnimateItem).toHaveBeenCalledWith(0);
+  });
+
+  it('stops animation when window width is 768px or more', async () => {
+    global.innerWidth = 768;
+    global.dispatchEvent(new Event('resize'));
+
+    wrapper.vm.handleResize();
+
+    expect(wrapper.vm.isAnimating).toBe(false);
+    expect(wrapper.vm.currentZoomedIndex).toBe(-1);
+  });
+
+  it('cleans up timeouts and event listeners on component unmount', () => {
+    const clearTimeoutSpy = jest.spyOn(window, 'clearTimeout');
+    const removeEventListenerSpy = jest.spyOn(window, 'removeEventListener');
+
+    wrapper.destroy();
+
+    expect(clearTimeoutSpy).toHaveBeenCalledTimes(2);
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('resize', expect.any(Function));
+  });
+});
