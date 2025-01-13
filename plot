@@ -144,3 +144,93 @@ export default {
   text-shadow: 0 0 5px black;
 }
 </style>
+---------------------------
+import { shallowMount } from '@vue/test-utils';
+import TemperatureGraph from '@/components/TemperatureGraph.vue';
+import Plotly from 'plotly.js-dist';
+
+jest.mock('plotly.js-dist', () => ({
+  newPlot: jest.fn(),
+  extendTraces: jest.fn(),
+  relayout: jest.fn(),
+}));
+
+describe('TemperatureGraph.vue', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    jest.useFakeTimers(); // Use fake timers for interval testing
+    wrapper = shallowMount(TemperatureGraph);
+  });
+
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.restoreAllMocks();
+    wrapper.destroy();
+  });
+
+  test('renders the component correctly', () => {
+    expect(wrapper.find('.plot-container').exists()).toBe(true);
+    expect(wrapper.find('.side-bar').exists()).toBe(true);
+    expect(Plotly.newPlot).toHaveBeenCalled();
+  });
+
+  test('initializes the graph with correct axis ranges', () => {
+    const layout = Plotly.newPlot.mock.calls[0][2];
+    expect(layout.xaxis.range).toEqual([0, 50]);
+    expect(layout.yaxis.range).toEqual([0, 100]);
+  });
+
+  test('generates valid random temperatures', () => {
+    for (let i = 0; i < 10; i++) {
+      const temp = wrapper.vm.generateRandomTemperature();
+      expect(temp).toBeGreaterThanOrEqual(0);
+      expect(temp).toBeLessThanOrEqual(100);
+    }
+  });
+
+  test('updates the graph with correct data and sidebar color', () => {
+    const temp = 45; // Simulate a temperature above 40°C
+    wrapper.vm.updatePlot(temp);
+
+    // Check Plotly.extendTraces was called with the correct data
+    expect(Plotly.extendTraces).toHaveBeenCalledWith(
+      wrapper.vm.$refs.plot,
+      { x: [[0]], y: [[temp]] },
+      [0]
+    );
+
+    // Check sidebar color
+    expect(wrapper.vm.currentColor).toBe('red');
+    expect(wrapper.vm.currentTemperature).toBe(temp);
+  });
+
+  test('updates the sidebar for temperatures below 10°C', () => {
+    const temp = 5; // Simulate a temperature below 10°C
+    wrapper.vm.updatePlot(temp);
+
+    expect(wrapper.vm.currentColor).toBe('blue');
+    expect(wrapper.vm.currentTemperature).toBe(temp);
+  });
+
+  test('adjusts the x-axis range dynamically', () => {
+    for (let i = 0; i <= 55; i++) {
+      wrapper.vm.updatePlot(20); // Simulate 55 data points
+    }
+
+    // Check x-axis range adjustment
+    expect(Plotly.relayout).toHaveBeenCalledWith(wrapper.vm.$refs.plot, {
+      'xaxis.range': [5, 55],
+    });
+  });
+
+  test('starts graphing and stops after 1000 points', () => {
+    wrapper.vm.startGraphing();
+
+    // Fast-forward time to simulate intervals
+    jest.advanceTimersByTime(1000 * 1000);
+
+    expect(wrapper.vm.index).toBe(1000);
+    expect(clearInterval).toHaveBeenCalled();
+  });
+});
