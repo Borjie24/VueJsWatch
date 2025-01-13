@@ -88,3 +88,117 @@ describe('Testing ErrorInformation.vue', () => {
     expect(wrapper.vm.currentZoomedIndex).toBe(2);
   });
 });
+
+------------------
+import { shallowMount } from '@vue/test-utils';
+import ErrorInformation from '@/components/pages/ProcessInformationScreen/ErrorInformation.vue';
+
+describe('Testing ErrorInformation.vue', () => {
+  const abnormalitiesMock = [
+    {
+      error_code: 'エラー2-01',
+      error_message: 'Abnormal Elapsed Time',
+      process_name: '低高温検査機_高温検査',
+    },
+    {
+      error_code: 'エラー3-01',
+      error_message: 'Controller Error',
+      process_name: '外観検査',
+    },
+    {
+      error_code: 'エラー1-01',
+      error_message: '異常停止経過時間',
+      process_name: '成型機2',
+    },
+    {
+      error_code: 'エラー4-01',
+      error_message: 'High Control Rating',
+      process_name: '低高温検査機_OTP書き込み',
+    },
+  ];
+
+  const wrapper = shallowMount(ErrorInformation, {
+    global: {
+      components: {
+        VContainer: 'v-container',
+        VRow: 'v-row',
+        VCol: 'v-col',
+        VList: 'v-list',
+        VListItemTitle: 'v-list-item-title',
+      },
+    },
+    props: {
+      abnormalities: abnormalitiesMock,
+    },
+  });
+
+  test('test if wrapper exists', () => {
+    expect(wrapper.exists()).toBeTruthy();
+  });
+
+  test('renders the correct number of abnormalities', () => {
+    const items = wrapper.findAll('.zoom-item');
+    expect(items.length).toBe(abnormalitiesMock.length);
+  });
+
+  test('resets currentZoomedIndex on mouse leave', async () => {
+    wrapper.vm.currentZoomedIndex = 2;
+    await wrapper.vm.handleMouseLeave();
+    expect(wrapper.vm.currentZoomedIndex).toBe(null);
+  });
+
+  test('sets currentZoomedIndex on mouse enter if screen width is below threshold', async () => {
+    window.innerWidth = 500;
+    await wrapper.vm.handleMouseEnter(1);
+    expect(wrapper.vm.currentZoomedIndex).toBe(1);
+  });
+
+  test('does not set currentZoomedIndex on mouse enter if screen width is above threshold', async () => {
+    window.innerWidth = 1300;
+    await wrapper.vm.handleMouseEnter(1);
+    expect(wrapper.vm.currentZoomedIndex).toBe(-1);
+  });
+
+  test('renders correct content for each abnormality', () => {
+    const items = wrapper.findAll('.zoom-item');
+    items.forEach((item, index) => {
+      const textContent = item.text();
+      const abnormality = abnormalitiesMock[index];
+      expect(textContent).toContain(abnormality.error_code);
+      expect(textContent).toContain(abnormality.error_message);
+      expect(textContent).toContain(abnormality.process_name);
+    });
+  });
+
+  test('threshold testing for zoom functionality', () => {
+    window.innerWidth = 1200;
+    wrapper.vm.handleMouseEnter(2);
+    expect(wrapper.vm.currentZoomedIndex).toBe(-1);
+
+    window.innerWidth = 1199;
+    wrapper.vm.handleMouseEnter(2);
+    expect(wrapper.vm.currentZoomedIndex).toBe(2);
+  });
+
+  test('handleMouseEnter sets currentZoomedIndex or does nothing if above threshold', async () => {
+    window.innerWidth = 1199;
+    await wrapper.vm.handleMouseEnter(0);
+    expect(wrapper.vm.currentZoomedIndex).toBe(0);
+
+    window.innerWidth = 1200;
+    await wrapper.vm.handleMouseEnter(1);
+    expect(wrapper.vm.currentZoomedIndex).toBe(0); // No change since threshold is not met
+  });
+
+  test('handleMouseLeave resets currentZoomedIndex or does nothing if above threshold', async () => {
+    wrapper.vm.currentZoomedIndex = 1;
+
+    window.innerWidth = 1199;
+    await wrapper.vm.handleMouseLeave();
+    expect(wrapper.vm.currentZoomedIndex).toBe(null);
+
+    window.innerWidth = 1200;
+    await wrapper.vm.handleMouseLeave();
+    expect(wrapper.vm.currentZoomedIndex).toBe(null); // No change since threshold is not met
+  });
+});
