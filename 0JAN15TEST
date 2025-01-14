@@ -2,6 +2,7 @@ import { shallowMount } from '@vue/test-utils';
 import PlotComponent from '@/components/PlotComponent.vue'; // Adjust the import path accordingly
 import Plotly from 'plotly.js-dist';
 
+// Mocking Plotly.js methods to track calls and their arguments
 jest.mock('plotly.js-dist', () => ({
   newPlot: jest.fn(),
   extendTraces: jest.fn(),
@@ -26,25 +27,35 @@ describe('PlotComponent.vue', () => {
     });
   });
 
-  it('initializes the plot correctly', () => {
+  it('initializes the plot correctly with the config options', () => {
     expect(Plotly.newPlot).toHaveBeenCalledWith(
       wrapper.vm.$refs.plot,
       wrapper.props().plotData,
       wrapper.props().layout,
-      wrapper.props().config
+      expect.objectContaining({
+        scrollZoom: false,
+        displayModeBar: false,
+        responsive: true,
+      })
     );
   });
 
   it('starts dynamic updates when dynamicUpdate is provided', () => {
-    jest.useFakeTimers();
+    jest.useFakeTimers(); // Use fake timers for setInterval
+
+    // Start dynamic updates
     wrapper.vm.startDynamicUpdates();
 
-    // Advance the timer by the update interval
+    // Advance the timer by the update interval (1000ms)
     jest.advanceTimersByTime(wrapper.props().updateInterval);
 
-    expect(wrapper.vm.index).toBe(1);
-    expect(Plotly.extendTraces).toHaveBeenCalled();
+    // Verify that dynamicUpdate was called and Plotly methods were invoked
+    expect(wrapper.props().dynamicUpdate).toHaveBeenCalledWith(0); // index starts at 0
+    expect(Plotly.extendTraces).toHaveBeenCalledWith(wrapper.vm.$refs.plot, [{ x: [4], y: [5] }], [0]);
     expect(Plotly.relayout).toHaveBeenCalledWith(wrapper.vm.$refs.plot, { title: 'Updated Plot' });
+
+    // Verify the increment of the index
+    expect(wrapper.vm.index).toBe(1);
   });
 
   it('does not start dynamic updates if dynamicUpdate is not provided', () => {
@@ -53,25 +64,28 @@ describe('PlotComponent.vue', () => {
         plotData: [{ x: [1, 2, 3], y: [2, 3, 4], type: 'scatter' }],
         layout: { title: 'Test Plot' },
         config: { responsive: true },
+        updateInterval: 1000,
       },
     });
 
-    jest.useFakeTimers();
+    jest.useFakeTimers(); // Use fake timers for setInterval
     wrapperWithoutDynamicUpdate.vm.startDynamicUpdates();
 
-    // Ensure the dynamic update function was not called
+    // Verify that no interval ID is set, and dynamic updates are not called
     expect(wrapperWithoutDynamicUpdate.vm.intervalId).toBeNull();
   });
 
   it('calls updatePlot with correct parameters', () => {
     const traceUpdates = { data: [{ x: [1], y: [2] }] };
     const layoutUpdates = { title: 'New Title' };
+
     wrapper.vm.updatePlot(traceUpdates, layoutUpdates);
 
     expect(Plotly.extendTraces).toHaveBeenCalledWith(wrapper.vm.$refs.plot, traceUpdates.data, [0]);
     expect(Plotly.relayout).toHaveBeenCalledWith(wrapper.vm.$refs.plot, layoutUpdates);
   });
 });
+
 -----------------------------------------
 
 import { shallowMount } from '@vue/test-utils';
