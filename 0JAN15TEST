@@ -1,0 +1,139 @@
+import { shallowMount } from '@vue/test-utils';
+import PlotComponent from '@/components/PlotComponent.vue'; // Adjust the import path accordingly
+import Plotly from 'plotly.js-dist';
+
+jest.mock('plotly.js-dist', () => ({
+  newPlot: jest.fn(),
+  extendTraces: jest.fn(),
+  relayout: jest.fn(),
+}));
+
+describe('PlotComponent.vue', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = shallowMount(PlotComponent, {
+      propsData: {
+        plotData: [{ x: [1, 2, 3], y: [2, 3, 4], type: 'scatter' }],
+        layout: { title: 'Test Plot' },
+        config: { responsive: true },
+        updateInterval: 1000,
+        dynamicUpdate: jest.fn(() => ({
+          traceUpdates: { data: [{ x: [4], y: [5] }] }, 
+          layoutUpdates: { title: 'Updated Plot' }
+        })),
+      },
+    });
+  });
+
+  it('initializes the plot correctly', () => {
+    expect(Plotly.newPlot).toHaveBeenCalledWith(
+      wrapper.vm.$refs.plot,
+      wrapper.props().plotData,
+      wrapper.props().layout,
+      wrapper.props().config
+    );
+  });
+
+  it('starts dynamic updates when dynamicUpdate is provided', () => {
+    jest.useFakeTimers();
+    wrapper.vm.startDynamicUpdates();
+
+    // Advance the timer by the update interval
+    jest.advanceTimersByTime(wrapper.props().updateInterval);
+
+    expect(wrapper.vm.index).toBe(1);
+    expect(Plotly.extendTraces).toHaveBeenCalled();
+    expect(Plotly.relayout).toHaveBeenCalledWith(wrapper.vm.$refs.plot, { title: 'Updated Plot' });
+  });
+
+  it('does not start dynamic updates if dynamicUpdate is not provided', () => {
+    const wrapperWithoutDynamicUpdate = shallowMount(PlotComponent, {
+      propsData: {
+        plotData: [{ x: [1, 2, 3], y: [2, 3, 4], type: 'scatter' }],
+        layout: { title: 'Test Plot' },
+        config: { responsive: true },
+      },
+    });
+
+    jest.useFakeTimers();
+    wrapperWithoutDynamicUpdate.vm.startDynamicUpdates();
+
+    // Ensure the dynamic update function was not called
+    expect(wrapperWithoutDynamicUpdate.vm.intervalId).toBeNull();
+  });
+
+  it('calls updatePlot with correct parameters', () => {
+    const traceUpdates = { data: [{ x: [1], y: [2] }] };
+    const layoutUpdates = { title: 'New Title' };
+    wrapper.vm.updatePlot(traceUpdates, layoutUpdates);
+
+    expect(Plotly.extendTraces).toHaveBeenCalledWith(wrapper.vm.$refs.plot, traceUpdates.data, [0]);
+    expect(Plotly.relayout).toHaveBeenCalledWith(wrapper.vm.$refs.plot, layoutUpdates);
+  });
+});
+-----------------------------------------
+
+import { shallowMount } from '@vue/test-utils';
+import PlotContainer from '@/components/PlotContainer.vue'; // Adjust the import path accordingly
+import CommonPlot from '@/components/CommonPlot.vue'; // Adjust the import path accordingly
+
+jest.mock('@/components/CommonPlot.vue', () => ({
+  name: 'CommonPlot',
+  props: ['plotData', 'layout', 'config', 'dynamicUpdate', 'updateInterval'],
+  template: '<div></div>',
+}));
+
+describe('PlotContainer.vue', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = shallowMount(PlotContainer, {
+      data() {
+        return {
+          plotData: [{ x: [1, 2, 3], y: [2, 3, 4], type: 'scatter' }],
+          layout: { title: 'Test Plot' },
+          config: {},
+          currentColor: 'green',
+          currentTemperature: 0,
+          temperatureData: [15, 25, 35, 45, 55], // Sample temperature data
+        };
+      },
+    });
+  });
+
+  it('renders the CommonPlot component', () => {
+    expect(wrapper.findComponent(CommonPlot).exists()).toBe(true);
+  });
+
+  it('generates dynamic data and updates the color and temperature', () => {
+    // Simulate dynamic data generation
+    const dynamicData = wrapper.vm.generateDynamicData(2); // Passing index 2 (35°C)
+
+    expect(dynamicData.traceUpdates.data.x[0]).toEqual([2]);
+    expect(dynamicData.traceUpdates.data.y[0]).toEqual([35]);
+    expect(wrapper.vm.currentColor).toBe('green');
+    expect(wrapper.vm.currentTemperature).toBe(35);
+  });
+
+  it('updates the color to red when temperature is above 40°C', () => {
+    wrapper.vm.generateDynamicData(3); // Passing index 3 (45°C)
+    expect(wrapper.vm.currentColor).toBe('red');
+  });
+
+  it('updates the color to blue when temperature is below 10°C', () => {
+    wrapper.vm.temperatureData = [5, 15, 25, 35, 45]; // Modify data to include below 10°C
+    wrapper.vm.generateDynamicData(0); // Passing index 0 (5°C)
+    expect(wrapper.vm.currentColor).toBe('blue');
+  });
+
+  it('adjusts the x-axis range after index 50', () => {
+    const dynamicData = wrapper.vm.generateDynamicData(51); // Passing index 51
+    expect(dynamicData.layoutUpdates).toEqual({ 'xaxis.range': [1, 51] });
+  });
+
+  it('does not adjust the x-axis range before index 50', () => {
+    const dynamicData = wrapper.vm.generateDynamicData(30); // Passing index 30
+    expect(dynamicData.layoutUpdates).toEqual({});
+  });
+});
