@@ -1,0 +1,89 @@
+<template>
+  <v-container>
+    <v-col v-show="currentComponent === 'ProcessChart'">
+      <Processchart />
+    </v-col>
+    <v-col v-show="currentComponent === 'ErrorInformation'">
+      <Errorinformation />
+    </v-col>
+    <v-col v-show="currentComponent === 'Temperature'">
+      <Temperature />
+    </v-col>
+  </v-container>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      currentComponent: 'ProcessChart', // Start with ProcessChart
+    };
+  },
+  methods: {
+    startSwitchInterval() {
+      const intervals = [
+        { component: 'ProcessChart', duration: 7000 },
+        { component: 'ErrorInformation', duration: 7000 },
+        { component: 'Temperature', duration: 5000 },
+      ];
+
+      let index = 0;
+
+      const switchComponent = () => {
+        this.currentComponent = intervals[index].component;
+        setTimeout(() => {
+          index = (index + 1) % intervals.length; // Cycle through the components
+          switchComponent();
+        }, intervals[index].duration);
+      };
+
+      switchComponent(); // Start the cycle
+    },
+  },
+  mounted() {
+    this.startSwitchInterval();
+  },
+};
+</script>
+---------
+import { shallowMount } from '@vue/test-utils';
+import YourComponent from '@/components/YourComponent.vue'; // Adjust the path as necessary
+
+jest.useFakeTimers(); // Use fake timers to control the timing in tests
+
+describe('Component Switching with shallowMount', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = shallowMount(YourComponent);
+  });
+
+  it('should start with ProcessChart', () => {
+    expect(wrapper.vm.currentComponent).toBe('ProcessChart');
+  });
+
+  it('should switch to ErrorInformation after 7 seconds', () => {
+    jest.advanceTimersByTime(7000);
+    expect(wrapper.vm.currentComponent).toBe('ErrorInformation');
+  });
+
+  it('should switch to Temperature after 14 seconds', () => {
+    jest.advanceTimersByTime(14000);
+    expect(wrapper.vm.currentComponent).toBe('Temperature');
+  });
+
+  it('should switch back to ProcessChart after 19 seconds', () => {
+    jest.advanceTimersByTime(19000);
+    expect(wrapper.vm.currentComponent).toBe('ProcessChart');
+  });
+
+  it('should repeat the cycle correctly', () => {
+    jest.advanceTimersByTime(38000); // Complete two full cycles
+    expect(wrapper.vm.currentComponent).toBe('ProcessChart');
+  });
+
+  afterEach(() => {
+    wrapper.unmount();
+  });
+});
+
