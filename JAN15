@@ -1,0 +1,161 @@
+<template>
+  <v-container>
+    <v-col v-show="currentComponent === 'ProcessChart'">
+      <Processchart />
+    </v-col>
+    <v-col v-show="currentComponent === 'ErrorInformation'">
+      <Errorinformation />
+    </v-col>
+    <v-col v-show="currentComponent === 'Temperature'">
+      <Temperature />
+    </v-col>
+  </v-container>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      currentComponent: 'ProcessChart', // Start with ProcessChart
+    };
+  },
+  methods: {
+    switchComponent(intervals, index) {
+      const currentInterval = intervals[index];
+      this.currentComponent = currentInterval.component;
+
+      setTimeout(() => {
+        const nextIndex = (index + 1) % intervals.length;
+        this.switchComponent(intervals, nextIndex); // Recursively call to switch to the next component
+      }, currentInterval.duration);
+    },
+
+    startSwitchInterval() {
+      const intervals = [
+        { component: 'ProcessChart', duration: 7000 },
+        { component: 'ErrorInformation', duration: 7000 },
+        { component: 'Temperature', duration: 5000 },
+      ];
+
+      this.switchComponent(intervals, 0); // Start the cycle
+    },
+  },
+  mounted() {
+    this.startSwitchInterval();
+  },
+};
+</script>
+
+import { mount } from '@vue/test-utils';
+import ComponentWithSwitching from '@/path-to-your-component.vue'; // Update the path to your component
+
+jest.useFakeTimers();
+
+describe('ComponentWithSwitching.vue', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = mount(ComponentWithSwitching);
+  });
+
+  afterEach(() => {
+    wrapper.destroy();
+  });
+
+  it('should initialize with the correct component', () => {
+    expect(wrapper.vm.currentComponent).toBe('ProcessChart');
+  });
+
+  it('should switch components based on intervals', () => {
+    const intervals = [
+      { component: 'ProcessChart', duration: 7000 },
+      { component: 'ErrorInformation', duration: 7000 },
+      { component: 'Temperature', duration: 5000 },
+    ];
+
+    wrapper.vm.switchComponent(intervals, 0);
+
+    // Fast-forward time and assert transitions
+    jest.advanceTimersByTime(7000);
+    expect(wrapper.vm.currentComponent).toBe('ErrorInformation');
+
+    jest.advanceTimersByTime(7000);
+    expect(wrapper.vm.currentComponent).toBe('Temperature');
+
+    jest.advanceTimersByTime(5000);
+    expect(wrapper.vm.currentComponent).toBe('ProcessChart');
+  });
+
+  it('should call startSwitchInterval on mount', () => {
+    const startSwitchIntervalSpy = jest.spyOn(wrapper.vm, 'startSwitchInterval');
+    wrapper.vm.startSwitchInterval();
+    expect(startSwitchIntervalSpy).toHaveBeenCalled();
+  });
+});
+
+---------------------------
+<template>
+  <v-container>
+    <v-col v-show="currentComponent === 'ProcessChart'">
+      <Processchart />
+    </v-col>
+    <v-col v-show="currentComponent === 'ErrorInformation'">
+      <Errorinformation />
+    </v-col>
+    <v-col v-show="currentComponent === 'Temperature'">
+      <Temperature />
+    </v-col>
+  </v-container>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      /**
+       * The name of the currently displayed component.
+       * @type {string}
+       */
+      currentComponent: 'ProcessChart', // Start with ProcessChart
+    };
+  },
+  methods: {
+    /**
+     * Switches the displayed component based on the provided intervals and index.
+     * Recursively schedules the next switch after the current interval's duration.
+     * 
+     * @param {Array<Object>} intervals - Array of interval objects containing component names and durations.
+     * @param {number} index - The current index in the intervals array.
+     */
+    switchComponent(intervals, index) {
+      const currentInterval = intervals[index];
+      this.currentComponent = currentInterval.component;
+
+      setTimeout(() => {
+        const nextIndex = (index + 1) % intervals.length;
+        this.switchComponent(intervals, nextIndex); // Recursively call to switch to the next component
+      }, currentInterval.duration);
+    },
+
+    /**
+     * Initializes the component switching process.
+     * Defines the intervals and starts the switching cycle from the first component.
+     */
+    startSwitchInterval() {
+      const intervals = [
+        { component: 'ProcessChart', duration: 7000 },
+        { component: 'ErrorInformation', duration: 7000 },
+        { component: 'Temperature', duration: 5000 },
+      ];
+
+      this.switchComponent(intervals, 0); // Start the cycle
+    },
+  },
+  mounted() {
+    /**
+     * Lifecycle hook that starts the component switching interval when the component is mounted.
+     */
+    this.startSwitchInterval();
+  },
+};
+</script>
