@@ -132,9 +132,16 @@ export default {
     }
   },
   methods: {
-    initializePlot() {
-      Plotly.newPlot(this.$refs.plot, this.plotData, this.layout, this.config);
-    },
+   initializePlot() {
+  const config = {
+    ...this.config, // Retain any user-defined config properties
+    scrollZoom: false,  // Disable zooming
+    displayModeBar: false,  // Disable the mode bar (which includes reset, autoscale, etc.)
+    responsive: true,  // Optional: Make the plot responsive to container resizing
+  };
+
+  Plotly.newPlot(this.$refs.plot, this.plotData, this.layout, config);
+},
     updatePlot(traceUpdates, layoutUpdates = {}) {
       if (traceUpdates) {
         Plotly.extendTraces(this.$refs.plot, traceUpdates.data, traceUpdates.traces);
