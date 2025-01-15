@@ -1,0 +1,75 @@
+import { shallowMount } from '@vue/test-utils';
+import PlotContainer from '@/components/PlotContainer.vue'; // Adjust the import path accordingly
+import CommonPlot from '@/components/CommonPlot.vue'; // Adjust the import path accordingly
+import CommonGauge from '@/components/CommonGauge.vue'; // Import CommonGauge
+
+jest.mock('@/components/CommonPlot.vue', () => ({
+  name: 'CommonPlot',
+  props: ['plotData', 'layout', 'config', 'dynamicUpdate', 'updateInterval'],
+  template: '<div></div>',
+}));
+
+jest.mock('@/components/CommonGauge.vue', () => ({
+  name: 'CommonGauge',
+  props: ['currentTemperature', 'currentColor', 'gaugeLayout', 'gaugeData'],
+  template: '<div></div>',
+}));
+
+describe('PlotContainer.vue', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = shallowMount(PlotContainer, {
+      data() {
+        return {
+          plotData: [{ x: [1, 2, 3], y: [2, 3, 4], type: 'scatter' }],
+          layout: { title: 'Test Plot' },
+          config: {},
+          currentColor: 'green',
+          currentTemperature: 0,
+          temperatureData: [15, 25, 35, 45, 55],
+          gaugeLayout: {}, // Provide mock layout for the gauge
+          gaugeData: {}, // Provide mock data for the gauge
+        };
+      },
+    });
+  });
+
+  it('renders the CommonPlot and CommonGauge components', () => {
+    // Check that both CommonPlot and CommonGauge are rendered
+    expect(wrapper.findComponent(CommonPlot).exists()).toBe(true);
+    expect(wrapper.findComponent(CommonGauge).exists()).toBe(true);
+  });
+
+  it('calls updateGauge when currentTemperature changes', async () => {
+    // Simulate a temperature change and verify the color update
+    await wrapper.setData({ currentTemperature: 45 });
+    expect(wrapper.vm.currentColor).toBe('red');
+    await wrapper.setData({ currentTemperature: 5 });
+    expect(wrapper.vm.currentColor).toBe('blue');
+  });
+
+  it('updates the currentTemperature when generateDynamicData is called', () => {
+    // Simulate generating dynamic data
+    const dynamicData = wrapper.vm.generateDynamicData(2); // Passing index 2 (35°C)
+    expect(wrapper.vm.currentTemperature).toBe(35);
+  });
+
+  it('renders the side-bar correctly', () => {
+    // Check if the side-bar exists and is styled correctly
+    const sideBar = wrapper.find('.side-bar');
+    expect(sideBar.exists()).toBe(true);
+    expect(sideBar.attributes('style')).toContain('width: 500px');
+    expect(sideBar.attributes('style')).toContain('height: 500px');
+  });
+
+  it('correctly updates the x-axis range when index > 50', () => {
+    const dynamicData = wrapper.vm.generateDynamicData(51); // Passing index 51
+    expect(dynamicData.layoutUpdates).toEqual({ 'xaxis.range': [1, 51] });
+  });
+
+  it('does not update the x-axis range when index <= 50', () => {
+    const dynamicData = wrapper.vm.generateDynamicData(30); // Passing index 30
+    expect(dynamicData.layoutUpdates).toEqual({});
+  });
+});
