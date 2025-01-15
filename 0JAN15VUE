@@ -1,0 +1,70 @@
+<template>
+  <div class="container">
+    <CommonPlot
+      :plotData="plotData"
+      :layout="layout"
+      :config="config"
+      :dynamicUpdate="generateDynamicData"
+      :updateInterval="1000"
+    />
+    <vue-speedometer
+      :value="currentTemperature"
+      :min-value="0"
+      :max-value="100"
+      :segments="5"
+      :segment-colors="['blue', 'green', 'yellow', 'orange', 'red']"
+      :custom-segment-labels="customLabels"
+      :needle-color="'black'"
+      :text-color="'black'"
+    />
+  </div>
+</template>
+
+<script>
+import { plotData, layout, tempData } from "./plotConfig.js";
+import CommonPlot from "./CommonPlot.vue";
+import VueSpeedometer from "vue-speedometer";
+
+export default {
+  components: { CommonPlot, VueSpeedometer },
+  data() {
+    return {
+      plotData: plotData,
+      layout: layout,
+      config: {},
+      currentTemperature: 0,
+      temperatureData: tempData,
+      customLabels: [
+        { text: "Cold", position: "INSIDE", color: "blue" },
+        { text: "Cool", position: "INSIDE", color: "green" },
+        { text: "Warm", position: "INSIDE", color: "yellow" },
+        { text: "Hot", position: "INSIDE", color: "orange" },
+        { text: "Very Hot", position: "INSIDE", color: "red" },
+      ],
+    };
+  },
+  methods: {
+    generateDynamicData(index) {
+      const temp = this.temperatureData[index % this.temperatureData.length];
+      this.currentTemperature = temp;
+
+      const traceUpdates = {
+        data: { x: [[index]], y: [[temp]] },
+        traces: [0],
+      };
+
+      const layoutUpdates = index > 50 ? { "xaxis.range": [index - 50, index] } : {};
+
+      return { traceUpdates, layoutUpdates };
+    },
+  },
+};
+</script>
+
+<style scoped>
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+</style>
