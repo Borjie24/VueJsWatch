@@ -1,0 +1,168 @@
+<template>
+  <div ref="gaugeContainer"></div>
+</template>
+
+<script>
+import Plotly from "plotly.js-dist";
+
+export default {
+  props: {
+    currentTemperature: {
+      type: Number,
+      default: 0,
+    },
+    currentColor: {
+      type: String,
+      default: 'green',
+    },
+    gaugeLayout: {
+      type: Object,
+      required: true,
+    },
+    gaugeData: {
+      type: Array,
+      required: true,
+    },
+  },
+  watch: {
+    currentTemperature(newTemp) {
+      this.updateGauge(newTemp);
+    },
+    currentColor(newColor) {
+      this.updateGaugeColor(newColor);
+    },
+  },
+  mounted() {
+    this.initializeGauge();
+  },
+  methods: {
+    initializeGauge() {
+      Plotly.newPlot(this.$refs.gaugeContainer, this.gaugeData, this.gaugeLayout);
+    },
+    updateGauge(newTemp) {
+      const updates = {
+        value: newTemp,
+      };
+      Plotly.update(this.$refs.gaugeContainer, updates, {}, 0);
+    },
+    updateGaugeColor(newColor) {
+      const updates = {
+        "gauge.bar.color": newColor,
+      };
+      Plotly.update(this.$refs.gaugeContainer, updates, {}, 0);
+    },
+  },
+};
+</script>
+
+<style scoped>
+/* Add styles if needed */
+</style>
+--------------------------------------
+<template>
+  <div class="container">
+    <CommonPlot
+      :plotData="plotData"
+      :layout="layout"
+      :config="config"
+      :dynamicUpdate="generateDynamicData"
+      :updateInterval="1000"
+    />
+    <div class="side-bar">
+      <CommonGauge
+        :currentTemperature="currentTemperature"
+        :currentColor="currentColor"
+        :gaugeLayout="gaugeLayout"
+        :gaugeData="gaugeData"
+      />
+    </div>
+  </div>
+</template>
+
+<script>
+import { plotData, layout, tempData, gaugeLayout, gaugeData } from "./plotConfig.js";
+import CommonPlot from "./CommonPlot.vue";
+import CommonGauge from "./CommonGauge.vue"; // Import the new CommonGauge component
+
+export default {
+  components: { CommonPlot, CommonGauge },
+  data() {
+    return {
+      plotData: plotData,
+      layout: layout,
+      config: {},
+      currentTemperature: 0,
+      currentColor: 'green', // Default color for the bar
+      temperatureData: tempData,
+      gaugeLayout: gaugeLayout, // Define the layout here
+      gaugeData: gaugeData, // Define the data here
+    };
+  },
+  watch: {
+    currentTemperature(newTemp) {
+      this.updateGauge(newTemp);
+    },
+  },
+  methods: {
+    updateGauge(newTemp) {
+      // Update the bar color based on the current temperature
+      this.currentColor = newTemp > 40 ? "red" : newTemp < 10 ? "blue" : "green";
+      this.currentTemperature = newTemp;
+    },
+    generateDynamicData(index) {
+      const temp = this.temperatureData[index % this.temperatureData.length];
+      this.currentTemperature = temp;
+      this.currentColor = temp > 40 ? "red" : temp < 10 ? "blue" : "green";
+
+      const traceUpdates = {
+        data: { x: [[index]], y: [[temp]] },
+        traces: [0],
+      };
+
+      const layoutUpdates = index > 50 ? { "xaxis.range": [index - 50, index] } : {};
+
+      return { traceUpdates, layoutUpdates };
+    },
+  },
+};
+</script>
+
+<style scoped>
+.container {
+  display: flex;
+  align-items: center;
+}
+.side-bar {
+  width: 500px;
+  height: 500px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-left: 10px;
+}
+</style>
+-------------------------------
+export const gaugeLayout = {
+  width: 500,
+  height: 500,
+  margin: { t: 1, b: 1, l: 0, r: 1 },
+  padding: { t: 3, b: 3, l: 3, r: 3 },
+};
+
+export const gaugeData = [
+        {
+          type: "indicator",
+          mode: "gauge+number",
+          value: 0,
+          gauge: {
+            axis: { range: [0, 100], tickwidth: 1, tickcolor: "darkblue" },
+            bar: {
+              color: "green", // Initial bar color
+            },
+            steps: [
+              { range: [0, 100], color: "gray" },
+            ],
+          },
+          number: { suffix: "°C" },
+        },
+      ];
