@@ -73,3 +73,76 @@ describe('PlotContainer.vue', () => {
     expect(dynamicData.layoutUpdates).toEqual({});
   });
 });
+-------------------------
+import { shallowMount } from '@vue/test-utils';
+import CommonGauge from '@/components/CommonGauge.vue'; // Adjust the import path accordingly
+import Plotly from 'plotly.js-dist';
+
+// Mock Plotly methods
+jest.mock('plotly.js-dist', () => ({
+  newPlot: jest.fn(),
+  update: jest.fn(),
+}));
+
+describe('CommonGauge.vue', () => {
+  let wrapper;
+
+  const mockGaugeLayout = { title: 'Temperature Gauge' };
+  const mockGaugeData = [
+    {
+      type: 'indicator',
+      mode: 'gauge+number',
+      value: 0,
+      gauge: {
+        axis: { range: [0, 100] },
+        bar: { color: 'green' },
+      },
+    },
+  ];
+
+  beforeEach(() => {
+    wrapper = shallowMount(CommonGauge, {
+      propsData: {
+        currentTemperature: 25,
+        currentColor: 'green',
+        gaugeLayout: mockGaugeLayout,
+        gaugeData: mockGaugeData,
+      },
+    });
+  });
+
+  it('initializes the gauge on mount', () => {
+    // Ensure Plotly.newPlot is called when the component is mounted
+    expect(Plotly.newPlot).toHaveBeenCalledWith(
+      wrapper.vm.$refs.gaugeContainer,
+      mockGaugeData,
+      mockGaugeLayout
+    );
+  });
+
+  it('updates the gauge value when currentTemperature changes', async () => {
+    const newTemperature = 35;
+    await wrapper.setProps({ currentTemperature: newTemperature });
+
+    // Ensure Plotly.update is called with the new temperature
+    expect(Plotly.update).toHaveBeenCalledWith(
+      wrapper.vm.$refs.gaugeContainer,
+      { value: newTemperature },
+      {},
+      0
+    );
+  });
+
+  it('updates the gauge color when currentColor changes', async () => {
+    const newColor = 'red';
+    await wrapper.setProps({ currentColor: newColor });
+
+    // Ensure Plotly.update is called with the new color
+    expect(Plotly.update).toHaveBeenCalledWith(
+      wrapper.vm.$refs.gaugeContainer,
+      { 'gauge.bar.color': newColor },
+      {},
+      0
+    );
+  });
+});
