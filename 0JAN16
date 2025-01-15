@@ -145,7 +145,7 @@ export default {
 export const gaugeLayout = {
   width: 500,
   height: 500,
-  margin: { t: 1, b: 1, l: 0, r: 1 },
+  margin: { t: 1, b: 1, l: 40, r: 40 },
   padding: { t: 3, b: 3, l: 3, r: 3 },
 };
 
