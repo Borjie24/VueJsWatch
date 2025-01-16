@@ -69,3 +69,77 @@ describe('Testing ProcessInformationScreen.vue with Error Handling', () => {
   // You can also test for any specific error handling that you might want to add in your methods.
   // For example, if you expect a specific behavior when an error occurs, you can test for it.
 })
+
+describe('createCanvas', () => {
+  let wrapper
+  const mockBlobUrl = 'blob:http://example.com/fake-blob-url'
+
+  beforeEach(() => {
+    wrapper = shallowMount(OperationStatusScreen, {
+      global: {
+        components: {
+          VSimpleTable: 'v-simple-table',
+          VContainer: 'v-container',
+          VCol: 'v-col',
+          VRow: 'v-row',
+        },
+      },
+      $refs: {
+        myCanvas: document.createElement('canvas'),
+      },
+      fetchProcessCoordinates: jest.fn().mockResolvedValue(),
+      rectangles: [
+        { x: 10, y: 20, width: 50, height: 50, operation_status: 1, process_id: 1 },
+        { x: 70, y: 80, width: 50, height: 50, operation_status: 3, process_id: 2 },
+      ],
+      data() {
+        return {
+          beginPath: jest.fn(),
+          arc: jest.fn(),
+          closePath: jest.fn(),
+          fillStyle: '',
+          fill: jest.fn(),
+          strokeStyle: '',
+          stroke: jest.fn(),
+          font: '',
+          textAlign: '',
+          textBaseline: '',
+          fillText: jest.fn(),
+          drawImage: jest.fn(),
+          fillRect: jest.fn(),
+          lineWidth: 0,
+          strokeRect: jest.fn(),
+        }
+      },
+    })
+
+    global.URL.createObjectURL = jest.fn().mockReturnValue(mockBlobUrl)
+  })
+
+  afterEach(() => {
+    jest.restoreAllMocks()
+    delete global.URL.createObjectURL
+  })
+
+  window.console.log = jest.fn()
+
+  it('should create a blob URL and draw on the canvas', async () => {
+    const mockImage = new Image()
+    const mockDrawImage = jest.spyOn(wrapper.vm.$refs.myCanvas.getContext('2d'), 'drawImage')
+
+    // Mock the image loading
+    mockImage.src = mockBlobUrl
+    mockImage.onload = jest.fn()
+
+    await wrapper.vm.createCanvas(mockBlobUrl)
+
+    expect(wrapper.vm.imageUrl).toBe(mockBlobUrl)
+    expect(mockDrawImage).toHaveBeenCalled()
+    expect(wrapper.vm.rectangles.length).toBeGreaterThan(0) // Ensure rectangles data is used
+
+    // Check if drawing functions are called
+    expect(wrapper.vm.fillRect).toHaveBeenCalled()
+    expect(wrapper.vm.strokeRect).toHaveBeenCalled()
+    expect(wrapper.vm.fillText).toHaveBeenCalled()
+  })
+})
