@@ -1,0 +1,201 @@
+export const gaugeLayout = {
+  width: 500,
+  height: 500,
+  margin: { t: 1, b: 1, l: 40, r: 40 },
+  annotations: [
+    {
+      text: "75°C", // Dynamic value can be updated
+      font: {
+        size: 20,
+        color: "black",
+      },
+      showarrow: false,
+      x: 0.5,
+      y: 0.5,
+    },
+  ],
+};
+
+export const gaugeData = [
+  {
+    type: "pie",
+    values: [75, 25], // Example: 75% filled, 25% remaining
+    labels: ["Filled", "Remaining"],
+    textinfo: "label+percent",
+    hole: 0.5, // Creates a donut-like shape
+    rotation: 90, // Start from the top
+    marker: {
+      colors: ["green", "gray"], // Filled and unfilled colors
+    },
+    direction: "clockwise",
+    showlegend: false, // Hide the legend
+  },
+];
+
+-----------------
+<template>
+  <div ref="gaugeContainer"></div>
+</template>
+
+<script>
+import Plotly from "plotly.js-dist";
+
+export default {
+  props: {
+    currentTemperature: {
+      type: Number,
+      default: 0,
+    },
+    currentColor: {
+      type: String,
+      default: "green",
+    },
+  },
+  watch: {
+    currentTemperature(newTemp) {
+      this.updateGauge(newTemp);
+    },
+  },
+  mounted() {
+    this.initializeGauge();
+  },
+  methods: {
+    initializeGauge() {
+      const percentage = (this.currentTemperature / 100) * 360;
+      const values = [percentage, 360 - percentage];
+
+      Plotly.newPlot(
+        this.$refs.gaugeContainer,
+        [
+          {
+            type: "pie",
+            values: values,
+            labels: ["Filled", "Remaining"],
+            hole: 0.5,
+            rotation: 0,
+            textinfo: "none",
+            marker: {
+              colors: [this.currentColor, "gray"],
+            },
+            direction: "clockwise",
+            showlegend: false,
+          },
+        ],
+        {
+          width: 500,
+          height: 500,
+          margin: { t: 10, b: 10, l: 10, r: 10 },
+          annotations: [
+            {
+              text: `${this.currentTemperature}°C`,
+              font: { size: 24 },
+              showarrow: false,
+              x: 0.5,
+              y: 0.5,
+            },
+          ],
+        }
+      );
+    },
+    updateGauge(newTemp) {
+      const percentage = (newTemp / 100) * 360;
+      const newValues = [percentage, 360 - percentage];
+
+      Plotly.update(
+        this.$refs.gaugeContainer,
+        {
+          values: [newValues],
+          marker: { colors: [this.currentColor, "gray"] },
+        },
+        {
+          annotations: [
+            {
+              text: `${newTemp}°C`,
+              font: { size: 24 },
+              x: 0.5,
+              y: 0.5,
+            },
+          ],
+        },
+        [0]
+      );
+    },
+  },
+};
+</script>
+
+<style scoped>
+/* Add styles if needed */
+</style>
+----------------------
+import { shallowMount } from "@vue/test-utils";
+import GaugeComponent from "@/components/GaugeComponent.vue";
+import Plotly from "plotly.js-dist";
+
+jest.mock("plotly.js-dist", () => ({
+  newPlot: jest.fn(),
+  update: jest.fn(),
+}));
+
+describe("GaugeComponent.vue", () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = shallowMount(GaugeComponent, {
+      propsData: {
+        currentTemperature: 25,
+        currentColor: "blue",
+      },
+    });
+  });
+
+  afterEach(() => {
+    wrapper.unmount();
+    jest.clearAllMocks();
+  });
+
+  it("renders and initializes the gauge on mount", () => {
+    expect(Plotly.newPlot).toHaveBeenCalledTimes(1);
+    expect(Plotly.newPlot).toHaveBeenCalledWith(
+      wrapper.vm.$refs.gaugeContainer,
+      expect.any(Array),
+      expect.objectContaining({
+        annotations: expect.arrayContaining([
+          expect.objectContaining({
+            text: "25°C",
+          }),
+        ]),
+      })
+    );
+  });
+
+  it("updates the gauge when currentTemperature prop changes", async () => {
+    await wrapper.setProps({ currentTemperature: 50 });
+
+    expect(Plotly.update).toHaveBeenCalledTimes(1);
+    expect(Plotly.update).toHaveBeenCalledWith(
+      wrapper.vm.$refs.gaugeContainer,
+      expect.objectContaining({
+        values: expect.any(Array),
+        marker: expect.objectContaining({
+          colors: ["blue", "gray"],
+        }),
+      }),
+      expect.objectContaining({
+        annotations: expect.arrayContaining([
+          expect.objectContaining({
+            text: "50°C",
+          }),
+        ]),
+      }),
+      [0]
+    );
+  });
+
+  it("uses default props when not provided", () => {
+    wrapper = shallowMount(GaugeComponent);
+
+    expect(wrapper.props().currentTemperature).toBe(0);
+    expect(wrapper.props().currentColor).toBe("green");
+  });
+});
