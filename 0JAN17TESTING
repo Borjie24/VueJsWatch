@@ -1,0 +1,71 @@
+import { shallowMount } from '@vue/test-utils'
+import ProcessInformationScreen from '@/components/pages/ProcessInformationScreen.vue'
+import 'jest-canvas-mock'
+import { FetchAPI } from '@/utility/apiRequest'
+
+jest.mock('@/utility/apiRequest', () => ({
+  FetchAPI: jest.fn(() => ({
+    get: jest.fn(() => Promise.reject(new Error('API error'))), // Simulating API error
+    put: jest.fn(() => Promise.resolve({ success: true, message_content: 'Updated successfully' })),
+  })),
+}))
+
+jest.spyOn(console, 'log').mockImplementation(() => {
+  return
+})
+
+jest.spyOn(console, 'warn').mockImplementation((message) => {
+  if (message.includes('[Vue warn]')) return
+})
+
+window.console.log = jest.fn()
+
+describe('Testing ProcessInformationScreen.vue with Error Handling', () => {
+  const wrapper = shallowMount(ProcessInformationScreen, {
+    global: {
+      components: {
+        VContainer: 'v-container',
+        VCol: 'v-col',
+        VRow: 'v-row',
+      },
+    },
+    data() {
+      return {
+        referenceCT: 0,
+        operationInformation: [],
+        incrementedUnits: 0,
+        incrementInterval: null,
+        operation_table: [],
+        replenishmentData: [],
+      }
+    },
+  })
+
+  it('should handle error when fetching operations', async () => {
+    await wrapper.vm.fetchAllOperations()
+    expect(console.log).toHaveBeenCalledWith('API error')
+  })
+
+  it('should handle error when fetching replenishment notice', async () => {
+    await wrapper.vm.fetchReplenishmentNotice()
+    expect(console.log).toHaveBeenCalledWith('API error')
+  })
+
+  it('should handle error when fetching abnormalities', async () => {
+    await wrapper.vm.fetchAbnormalities()
+    expect(console.log).toHaveBeenCalledWith('API error')
+  })
+
+  it('should handle error when fetching reference cycle time', async () => {
+    await wrapper.vm.fetchReferenceCT()
+    expect(console.log).toHaveBeenCalledWith('API error')
+  })
+
+  it('should handle error when updating planned units', async () => {
+    await wrapper.vm.updatePlannedUnits()
+    expect(console.log).toHaveBeenCalledWith('API error')
+  })
+
+  // You can also test for any specific error handling that you might want to add in your methods.
+  // For example, if you expect a specific behavior when an error occurs, you can test for it.
+})
