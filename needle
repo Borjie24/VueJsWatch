@@ -1,0 +1,169 @@
+<template>
+  <div ref="gaugeContainer"></div>
+</template>
+
+<script>
+import Plotly from "plotly.js-dist";
+
+export default {
+  props: {
+    currentTemperature: {
+      type: Number,
+      default: 0,
+    },
+    currentColor: {
+      type: String,
+      default: "green",
+    },
+    gaugeLayout: {
+      type: Object,
+      required: true,
+    },
+    gaugeData: {
+      type: Array,
+      required: true,
+    },
+  },
+  data() {
+    return {
+      lastTemperature: this.currentTemperature, // Store the last temperature
+      lastColor: this.currentColor, // Store the last color
+    };
+  },
+  watch: {
+    currentTemperature(newTemp) {
+      this.updateGauge(newTemp);
+      this.lastTemperature = newTemp; // Update the last temperature
+    },
+    currentColor(newColor) {
+      this.updateGaugeColor(newColor);
+      this.lastColor = newColor; // Update the last color
+    },
+  },
+  mounted() {
+    this.initializeGauge();
+  },
+  methods: {
+    initializeGauge() {
+      const needle = this.createNeedleShape(this.currentTemperature);
+      const layoutWithNeedle = {
+        ...this.gaugeLayout,
+        shapes: [needle],
+      };
+      Plotly.newPlot(this.$refs.gaugeContainer, this.gaugeData, layoutWithNeedle);
+    },
+    updateGauge(newTemp) {
+      const needle = this.createNeedleShape(newTemp);
+      const layoutUpdate = {
+        shapes: [needle],
+      };
+      Plotly.update(this.$refs.gaugeContainer, { value: [newTemp] }, layoutUpdate, 0);
+    },
+    updateGaugeColor(newColor) {
+      const updates = {
+        "gauge.bar.color": newColor,
+      };
+      Plotly.update(this.$refs.gaugeContainer, updates, {}, 0);
+    },
+    createNeedleShape(value) {
+      const angle = (value / 100) * 180; // Convert value to an angle (0-180)
+      const radians = ((180 - angle) * Math.PI) / 180; // Adjust for correct rotation (flip angle)
+
+      const x0 = 0.5; // Center x-coordinate
+      const y0 = 0.3; // Center y-coordinate
+      const needleLength = 0.4; // Length of the needle
+      const needleWidth = 0.02; // Width of the needle at the base
+
+      // Coordinates for the needle triangle
+      const xTip = x0 + needleLength * Math.cos(radians); // Tip of the needle
+      const yTip = y0 + needleLength * Math.sin(radians);
+
+      const xBaseLeft = x0 - needleWidth * Math.sin(radians); // Left base of the needle
+      const yBaseLeft = y0 + needleWidth * Math.cos(radians);
+
+      const xBaseRight = x0 + needleWidth * Math.sin(radians); // Right base of the needle
+      const yBaseRight = y0 - needleWidth * Math.cos(radians);
+
+      return {
+        type: "path",
+        path: `M ${xBaseLeft} ${yBaseLeft} L ${xTip} ${yTip} L ${xBaseRight} ${yBaseRight} Z`,
+        fillcolor: "red",
+        line: {
+          color: "red",
+        },
+      };
+    },
+  },
+};
+</script>
+
+<style scoped>
+/* Add styles if needed */
+</style>
+-----------------
+import { mount } from "@vue/test-utils";
+import Plotly from "plotly.js-dist";
+import GaugeComponent from "@/components/GaugeComponent.vue"; // Adjust path as needed
+
+jest.mock("plotly.js-dist", () => ({
+  newPlot: jest.fn(),
+  update: jest.fn(),
+}));
+
+describe("GaugeComponent.vue", () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = mount(GaugeComponent, {
+      propsData: {
+        currentTemperature: 50,
+        currentColor: "green",
+        gaugeLayout: {},
+        gaugeData: [],
+      },
+    });
+  });
+
+  it("initializes the gauge on mount", () => {
+    expect(Plotly.newPlot).toHaveBeenCalled();
+    expect(Plotly.newPlot).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        shapes: expect.arrayContaining([expect.objectContaining({ type: "path" })]),
+      }),
+      0
+    );
+  });
+
+  it("updates the gauge when the temperature changes", async () => {
+    await wrapper.setProps({ currentTemperature: 75 });
+    expect(Plotly.update).toHaveBeenCalled();
+    expect(Plotly.update).toHaveBeenCalledWith(
+      expect.anything(),
+      { value: [75] },
+      expect.objectContaining({
+        shapes: expect.arrayContaining([expect.objectContaining({ type: "path" })]),
+      }),
+      0
+    );
+  });
+
+  it("updates the gauge color when the color changes", async () => {
+    await wrapper.setProps({ currentColor: "blue" });
+    expect(Plotly.update).toHaveBeenCalled();
+    expect(Plotly.update).toHaveBeenCalledWith(
+      expect.anything(),
+      { "gauge.bar.color": "blue" },
+      {},
+      0
+    );
+  });
+
+  it("creates the correct needle shape based on the temperature", () => {
+    const needleShape = wrapper.vm.createNeedleShape(50);
+    expect(needleShape).toHaveProperty("type", "path");
+    expect(needleShape.path).toMatch(/M/); // Ensure the path contains a 'M' for the start
+  });
+});
+
