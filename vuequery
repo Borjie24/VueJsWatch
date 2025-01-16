@@ -1,0 +1,71 @@
+<template>
+  <div>
+    <button @click="fetchData">Fetch Data</button>
+    <div v-for="item in items" :key="item.id">
+      <span>{{ item.name }}</span>
+      <button @click="deleteItem(item.id)">Delete</button>
+    </div>
+  </div>
+</template>
+
+<script>
+import { useQuery, useQueryClient } from '@tanstack/vue-query';
+
+export default {
+  data() {
+    return {
+      items: [],  // This will hold the items fetched from the server
+    };
+  },
+  created() {
+    // Fetch initial data when the component is created
+    this.fetchData();
+  },
+  methods: {
+    // Fetch data using Vue Query
+    async fetchData() {
+      try {
+        const response = await fetch('/items');
+        const data = await response.json();
+        this.items = data.items;  // Store the fetched items in the component's data
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    },
+
+    // Delete an item from the server and refetch the list
+    async deleteItem(itemId) {
+      try {
+        const response = await fetch(`/delete_item/${itemId}`, {
+          method: 'DELETE',
+        });
+
+        if (response.ok) {
+          console.log(`Item ${itemId} deleted`);
+          this.$queryClient.invalidateQueries(['items']);  // Refetch data after deletion
+        } else {
+          console.error('Error deleting item');
+        }
+      } catch (error) {
+        console.error('Error deleting item:', error);
+      }
+    },
+  },
+  computed: {
+    // This computed property will be used to get the items from the query result
+    queryResult() {
+      return useQuery(['items'], async () => {
+        const response = await fetch('/items');
+        const data = await response.json();
+        return data.items;
+      });
+    },
+  },
+  watch: {
+    // Watch for changes to the query result and update the component's items
+    'queryResult.data'(newData) {
+      this.items = newData || [];
+    },
+  },
+};
+</script>
