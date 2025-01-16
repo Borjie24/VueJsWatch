@@ -1,0 +1,123 @@
+from flask import Flask
+from src.setup_db_example.database import db
+from src.setup_db_example.models.m_abnormalities import AbnormalitiesDb
+from src.setup_db_example.models.m_replenishment_notice import ReplenishmentDb
+from src.setup_db_example.models.m_operation import OperationInformationDb
+
+app = Flask(__name__)
+
+def setup_db():
+    # Insert multiple abnormalities records
+    abnormalities_data = [
+        {"error_code": "ERR001", "error_message": "Machine malfunction"},
+        {"error_code": "ERR002", "error_message": "Low battery"},
+        {"error_code": "ERR003", "error_message": "Overheating"},
+    ]
+    
+    for data in abnormalities_data:
+        new_abnormality = AbnormalitiesDb(
+            error_code=data["error_code"],
+            error_message=data["error_message"]
+        )
+        db.session.add(new_abnormality)
+
+    # Insert multiple operation records
+    operations_data = [
+        {
+            "process_name": "Assembly",
+            "operation_status": 1,
+            "product_number": 100,
+            "planned_number_units": 500,
+            "non_defective_products": 450,
+            "facility_cycle_time": 0.8,
+            "coordinates_id": 1  # Assuming this exists in the coordinates_tbl
+        },
+        {
+            "process_name": "Packaging",
+            "operation_status": 2,
+            "product_number": 150,
+            "planned_number_units": 400,
+            "non_defective_products": 380,
+            "facility_cycle_time": 0.7,
+            "coordinates_id": 2  # Assuming this exists in the coordinates_tbl
+        },
+    ]
+    
+    for data in operations_data:
+        new_operation = OperationInformationDb(
+            process_name=data["process_name"],
+            operation_status=data["operation_status"],
+            product_number=data["product_number"],
+            planned_number_units=data["planned_number_units"],
+            non_defective_products=data["non_defective_products"],
+            facility_cycle_time=data["facility_cycle_time"],
+            coordinates_id=data["coordinates_id"]
+        )
+        db.session.add(new_operation)
+
+    # Insert multiple replenishment records
+    replenishments_data = [
+        {
+            "setup_date_time": "2025-01-16 10:00:00",
+            "process_id": 1,  # Assuming this exists in the operation_information_tbl
+            "abnormalities_id": 1  # Assuming this exists in the abnormalities_tbl
+        },
+        {
+            "setup_date_time": "2025-01-16 11:00:00",
+            "process_id": 2,  # Assuming this exists in the operation_information_tbl
+            "abnormalities_id": 2  # Assuming this exists in the abnormalities_tbl
+        },
+    ]
+    
+    for data in replenishments_data:
+        new_replenishment = ReplenishmentDb(
+            setup_date_time=data["setup_date_time"],
+            process_id=data["process_id"],
+            abnormalities_id=data["abnormalities_id"]
+        )
+        db.session.add(new_replenishment)
+
+    # Commit all data at once to the database
+    db.session.commit()
+
+# Call this function during app initialization
+with app.app_context():
+    setup_db()
+
+if __name__ == "__main__":
+    app.run(debug=True)
+--------------------------------
+def test_abnormalities_data(setup_test_data):
+    """Test if abnormalities data is correctly inserted into the database"""
+    with app.app_context():
+        # Query the database to check if the abnormalities records were inserted
+        abnormalities = AbnormalitiesDb.query.all()
+        assert len(abnormalities) == 3  # We inserted 3 abnormalities
+        assert abnormalities[0].error_code == "ERR001"
+        assert abnormalities[0].error_message == "Machine malfunction"
+        assert abnormalities[1].error_code == "ERR002"
+        assert abnormalities[1].error_message == "Low battery"
+        assert abnormalities[2].error_code == "ERR003"
+        assert abnormalities[2].error_message == "Overheating"
+
+def test_operation_data(setup_test_data):
+    """Test if operation data is correctly inserted into the database"""
+    with app.app_context():
+        # Query the database to check if the operation records were inserted
+        operations = OperationInformationDb.query.all()
+        assert len(operations) == 2  # We inserted 2 operations
+        assert operations[0].process_name == "Assembly"
+        assert operations[1].process_name == "Packaging"
+        assert operations[0].operation_status == 1
+        assert operations[1].operation_status == 2
+
+def test_replenishment_data(setup_test_data):
+    """Test if replenishment data is correctly inserted into the database"""
+    with app.app_context():
+        # Query the database to check if the replenishment records were inserted
+        replenishments = ReplenishmentDb.query.all()
+        assert len(replenishments) == 2  # We inserted 2 replenishments
+        assert replenishments[0].setup_date_time == "2025-01-16 10:00:00"
+        assert replenishments[1].setup_date_time == "2025-01-16 11:00:00"
+        assert replenishments[0].process_id == 1
+        assert replenishments[1].process_id == 2
