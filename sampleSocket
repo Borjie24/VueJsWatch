@@ -1,0 +1,105 @@
+from flask import Flask, jsonify, request
+from flask_socketio import SocketIO, emit
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://username:password@localhost/dbname'
+app.config['SECRET_KEY'] = 'secret!'
+socketio = SocketIO(app)
+db = SQLAlchemy(app)
+
+class Item(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+@app.route('/items', methods=['GET'])
+def get_items():
+    items = Item.query.all()
+    return jsonify({'items': [{'id': item.id, 'name': item.name} for item in items]})
+
+@app.route('/delete_item/<int:item_id>', methods=['DELETE'])
+def delete_item(item_id):
+    item = Item.query.get(item_id)
+    if item:
+        db.session.delete(item)
+        db.session.commit()
+
+        # Emit an event to notify the frontend that an item was deleted
+        socketio.emit('item_deleted', {'item_id': item_id})
+        return jsonify({'message': 'Item deleted'}), 200
+    else:
+        return jsonify({'message': 'Item not found'}), 404
+
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Client disconnected')
+
+if __name__ == '__main__':
+    socketio.run(app, debug=True)
+-------------------------
+<template>
+  <div>
+    <button @click="fetchData">Fetch Data</button>
+    <div v-for="item in items" :key="item.id">
+      <span>{{ item.name }}</span>
+      <button @click="deleteItem(item.id)">Delete</button>
+    </div>
+  </div>
+</template>
+
+<script>
+import { io } from 'socket.io-client';
+
+export default {
+  data() {
+    return {
+      items: [],
+      socket: null
+    };
+  },
+  mounted() {
+    this.socket = io('http://localhost:5000');  // Replace with your Flask server URL
+
+    // Listen for the 'item_deleted' event from Flask
+    this.socket.on('item_deleted', (data) => {
+      console.log(`Item with ID ${data.item_id} deleted! Refetching data...`);
+      this.fetchData();  // Refetch data after deletion
+    });
+
+    // Initial data fetch
+    this.fetchData();
+  },
+  methods: {
+    async fetchData() {
+      try {
+        const response = await fetch('/items');  // Your API endpoint to fetch data
+        const data = await response.json();
+        this.items = data.items;
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    },
+    async deleteItem(itemId) {
+      try {
+        const response = await fetch(`/delete_item/${itemId}`, {
+          method: 'DELETE',
+        });
+
+        if (response.ok) {
+          console.log(`Item ${itemId} deleted`);
+        } else {
+          console.error('Error deleting item');
+        }
+      } catch (error) {
+        console.error('Error deleting item:', error);
+      }
+    }
+  }
+};
+</script>
