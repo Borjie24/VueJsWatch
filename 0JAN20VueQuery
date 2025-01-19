@@ -65,3 +65,59 @@ export default {
   },
 };
 </script>
+
+------------------
+import { shallowMount } from "@vue/test-utils";
+import { QueryClient, VueQueryPlugin } from "@tanstack/vue-query";
+import CoordinatesComponent from "@/components/CoordinatesComponent.vue"; // Adjust the path as needed
+
+describe("CoordinatesComponent", () => {
+  let queryClient;
+
+  beforeEach(() => {
+    // Set up Vue Query Plugin
+    queryClient = new QueryClient();
+  });
+
+  it("displays 'Loading...' initially", () => {
+    const wrapper = shallowMount(CoordinatesComponent, {
+      global: {
+        plugins: [[VueQueryPlugin, { queryClient }]],
+      },
+    });
+
+    expect(wrapper.text()).toContain("Loading...");
+  });
+
+  it("fetches and displays coordinates correctly", async () => {
+    // Mock fetch response
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [
+              { process_id: 1, operation_status: "Active", x: 100, y: 200 },
+              { process_id: 2, operation_status: "Inactive", x: 300, y: 400 },
+            ],
+          }),
+      })
+    );
+
+    const wrapper = shallowMount(CoordinatesComponent, {
+      global: {
+        plugins: [[VueQueryPlugin, { queryClient }]],
+      },
+    });
+
+    // Wait for Vue Query to resolve the fetch
+    await new Promise((resolve) => setTimeout(resolve, 0)); // Allow the microtask queue to flush
+
+    // Verify the data is rendered correctly
+    expect(wrapper.text()).toContain("Process ID: 1 | Status: Active | X: 100 | Y: 200");
+    expect(wrapper.text()).toContain("Process ID: 2 | Status: Inactive | X: 300 | Y: 400");
+
+    // Cleanup fetch mock
+    global.fetch.mockRestore();
+  });
+});
