@@ -1,0 +1,124 @@
+pip install flask-socketio eventlet
+
+from flask import Flask
+from flask_socketio import SocketIO
+from src.setup_db_example.models.m_operation_information import OperationInformationDb
+from src.setup_db_example.schemas.s_operation_information import OperationInformationSchema
+from src.setup_db_example.database import db
+
+app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
+operation_information_schema = OperationInformationSchema()
+
+
+@socketio.on("connect")
+def handle_connect():
+    print("Client connected")
+
+
+@socketio.on("disconnect")
+def handle_disconnect():
+    print("Client disconnected")
+
+
+def notify_clients():
+    """Emit a notification to all connected clients."""
+    socketio.emit("update", {"message": "Database updated"})
+
+
+@app.route("/api/get-coordinates", methods=["GET"])
+def get_coordinates():
+    """Fetch all coordinates."""
+    operation = OperationInformationDb
+    process = (
+        operation.query.filter(operation.process_id <= 14)
+        .order_by(operation.process_id)
+        .all()
+    )
+
+    operation_data = operation_information_schema(many=True).dump(process)
+
+    coordinates_data = [
+        {
+            "process_id": item["process_id"],
+            "operation_status": item["operation_status"],
+            "x": item["coordinates"]["x_position"],
+            "y": item["coordinates"]["y_position"],
+            "width": item["coordinates"]["width"],
+            "height": item["coordinates"]["height"],
+        }
+        for item in operation_data
+    ]
+
+    return {
+        "success": True,
+        "message_response": "COORDINATES FETCHED SUCCESSFULLY",
+        "data": coordinates_data,
+    }, 200
+
+
+if __name__ == "__main__":
+    socketio.run(app, debug=True)
+----------------------------------------
+npm install socket.io-client
+
+
+<template>
+  <div>
+    <h1>Real-Time Coordinates</h1>
+    <ul>
+      <li v-for="coord in coordinates" :key="coord.process_id">
+        Process ID: {{ coord.process_id }} | Status: {{ coord.operation_status }}
+        | X: {{ coord.x }} | Y: {{ coord.y }}
+      </li>
+    </ul>
+  </div>
+</template>
+
+<script>
+import { io } from "socket.io-client";
+
+export default {
+  data() {
+    return {
+      socket: null,
+      coordinates: [],
+    };
+  },
+  methods: {
+    fetchCoordinates() {
+      fetch("/api/get-coordinates")
+        .then((response) => response.json())
+        .then((data) => {
+          this.coordinates = data.data;
+        })
+        .catch((error) => console.error("Error fetching data:", error));
+    },
+    setupWebSocket() {
+      this.socket = io("http://localhost:5000");
+
+      this.socket.on("connect", () => {
+        console.log("WebSocket connected");
+      });
+
+      this.socket.on("disconnect", () => {
+        console.log("WebSocket disconnected");
+      });
+
+      this.socket.on("update", () => {
+        console.log("Database updated");
+        this.fetchCoordinates();
+      });
+    },
+  },
+  mounted() {
+    this.setupWebSocket();
+    this.fetchCoordinates();
+  },
+  beforeDestroy() {
+    if (this.socket) {
+      this.socket.disconnect();
+    }
+  },
+};
+</script>
