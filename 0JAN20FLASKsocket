@@ -122,3 +122,85 @@ export default {
   },
 };
 </script>
+
+----------------
+
+import { shallowMount } from "@vue/test-utils";
+import RealTimeCoordinates from "@/components/RealTimeCoordinates.vue"; // Adjust path as needed
+import { io } from "socket.io-client";
+
+jest.mock("socket.io-client");
+
+describe("RealTimeCoordinates Component", () => {
+  let mockSocket;
+
+  beforeEach(() => {
+    // Mock the socket.io client
+    mockSocket = {
+      on: jest.fn(),
+      emit: jest.fn(),
+      disconnect: jest.fn(),
+    };
+    io.mockReturnValue(mockSocket);
+
+    // Mock fetch API
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [
+              { process_id: 1, operation_status: "Active", x: 100, y: 200 },
+              { process_id: 2, operation_status: "Inactive", x: 300, y: 400 },
+            ],
+          }),
+      })
+    );
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    global.fetch.mockRestore();
+  });
+
+  it("fetches and displays coordinates on mount", async () => {
+    const wrapper = shallowMount(RealTimeCoordinates);
+
+    // Wait for fetch to complete
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Verify coordinates are rendered
+    expect(wrapper.text()).toContain("Process ID: 1 | Status: Active | X: 100 | Y: 200");
+    expect(wrapper.text()).toContain("Process ID: 2 | Status: Inactive | X: 300 | Y: 400");
+
+    // Verify fetch was called
+    expect(global.fetch).toHaveBeenCalledWith("/api/get-coordinates");
+  });
+
+  it("sets up WebSocket and handles events", () => {
+    const wrapper = shallowMount(RealTimeCoordinates);
+
+    // Verify WebSocket setup
+    expect(io).toHaveBeenCalledWith("http://localhost:5000");
+    expect(mockSocket.on).toHaveBeenCalledWith("connect", expect.any(Function));
+    expect(mockSocket.on).toHaveBeenCalledWith("disconnect", expect.any(Function));
+    expect(mockSocket.on).toHaveBeenCalledWith("update", expect.any(Function));
+
+    // Simulate WebSocket "update" event
+    const updateCallback = mockSocket.on.mock.calls.find((call) => call[0] === "update")[1];
+    updateCallback(); // Trigger the "update" event
+
+    // Verify fetch is called on update
+    expect(global.fetch).toHaveBeenCalledWith("/api/get-coordinates");
+  });
+
+  it("cleans up WebSocket on component destroy", () => {
+    const wrapper = shallowMount(RealTimeCoordinates);
+
+    // Trigger component destruction
+    wrapper.unmount();
+
+    // Verify WebSocket disconnect is called
+    expect(mockSocket.disconnect).toHaveBeenCalled();
+  });
+});
