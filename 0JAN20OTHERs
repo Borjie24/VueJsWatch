@@ -1,0 +1,222 @@
+Backend Implementation (Flask)
+__init__.py (Flask App Factory)
+python
+Copy
+Edit
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
+
+db = SQLAlchemy()
+
+def create_app():
+    app = Flask(__name__)
+    app.config.from_object('app.config.Config')
+
+    # Initialize extensions
+    db.init_app(app)
+    CORS(app)
+
+    # Register blueprints
+    from app.routes import api_blueprint
+    app.register_blueprint(api_blueprint)
+
+    return app
+websocket.py (WebSocket Setup)
+python
+Copy
+Edit
+from flask_socketio import SocketIO, emit
+
+socketio = SocketIO()
+
+def init_websocket(app):
+    socketio.init_app(app, cors_allowed_origins="*")
+
+@socketio.on('connect')
+def handle_connect():
+    print("Client connected")
+    emit('message', {'type': 'CONNECTED', 'message': 'Welcome!'})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print("Client disconnected")
+
+# Example for broadcasting updates
+def notify_update():
+    socketio.emit('message', {'type': 'ITEMS_UPDATED', 'message': 'Data updated'})
+routes.py (API Routes)
+python
+Copy
+Edit
+from flask import Blueprint, jsonify, request
+from app.models import Item
+from app.database import db
+from app.websocket import notify_update
+
+api_blueprint = Blueprint('api', __name__)
+
+@api_blueprint.route('/api/items', methods=['GET'])
+def get_items():
+    items = Item.query.all()
+    return jsonify([item.to_dict() for item in items])
+
+@api_blueprint.route('/api/items', methods=['POST'])
+def add_item():
+    data = request.get_json()
+    new_item = Item(name=data['name'])
+    db.session.add(new_item)
+    db.session.commit()
+
+    notify_update()  # Notify clients via WebSocket
+    return jsonify(new_item.to_dict()), 201
+models.py (Database Models)
+python
+Copy
+Edit
+from app.database import db
+
+class Item(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+
+    def to_dict(self):
+        return {"id": self.id, "name": self.name}
+database.py (Database Initialization)
+python
+Copy
+Edit
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()
+
+def init_db(app):
+    db.init_app(app)
+    with app.app_context():
+        db.create_all()
+wsgi.py (Running Flask with WebSocket)
+python
+Copy
+Edit
+from app import create_app
+from app.websocket import socketio
+
+app = create_app()
+
+if __name__ == '__main__':
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+Frontend Implementation (Vue.js - Options API)
+Install Vue Query
+bash
+Copy
+Edit
+npm install @tanstack/vue-query
+Create Composables for Fetching Data and WebSocket
+useItems.js (Data Fetching)
+javascript
+Copy
+Edit
+// composables/useItems.js
+import { useQuery } from '@tanstack/vue-query';
+import axios from 'axios';
+
+export function useItems() {
+  return useQuery({
+    queryKey: ['items'],
+    queryFn: async () => {
+      const { data } = await axios.get('http://localhost:5000/api/items');
+      return data;
+    },
+    staleTime: 10000,
+  });
+}
+useWebSocket.js (WebSocket Connection)
+javascript
+Copy
+Edit
+// composables/useWebSocket.js
+import { ref, onUnmounted } from 'vue';
+import { queryClient } from '@tanstack/vue-query';
+
+export function useWebSocket(url) {
+  const isConnected = ref(false);
+  let socket;
+
+  const connect = () => {
+    socket = new WebSocket(url);
+
+    socket.onopen = () => {
+      isConnected.value = true;
+      console.log('WebSocket connected');
+    };
+
+    socket.onmessage = (event) => {
+      const { type } = JSON.parse(event.data);
+
+      if (type === 'ITEMS_UPDATED') {
+        queryClient.invalidateQueries(['items']); // Refetch items
+      }
+    };
+
+    socket.onclose = () => {
+      isConnected.value = false;
+      console.log('WebSocket disconnected');
+    };
+  };
+
+  onUnmounted(() => {
+    if (socket) socket.close();
+  });
+
+  connect();
+
+  return { isConnected };
+}
+Vue Component (Options API)
+vue
+Copy
+Edit
+<template>
+  <div>
+    <h1>Items</h1>
+    <p v-if="isLoading">Loading...</p>
+    <ul v-else>
+      <li v-for="item in data" :key="item.id">{{ item.name }}</li>
+    </ul>
+    <p v-if="!isConnected" class="text-danger">WebSocket disconnected</p>
+  </div>
+</template>
+
+<script>
+import { useItems } from './composables/useItems';
+import { useWebSocket } from './composables/useWebSocket';
+
+export default {
+  data() {
+    return {
+      isConnected: false,
+    };
+  },
+  computed: {
+    ...useItems(),
+  },
+  watch: {
+    isConnected(newVal) {
+      if (newVal) {
+        console.log('WebSocket connected');
+      } else {
+        console.log('WebSocket disconnected');
+      }
+    },
+  },
+  methods: {
+    connectWebSocket() {
+      const { isConnected } = useWebSocket('ws://localhost:5000');
+      this.isConnected = isConnected;
+    },
+  },
+  mounted() {
+    this.connectWebSocket();
+  },
+};
+</script>
