@@ -1,0 +1,31 @@
+from tests.setup_db_example.base import BaseTestCase
+from src.setup_db_example.database import db
+from src.setup_db_example.models.m_operation_model import OperationModel
+from src.setup_db_example.andon_system import AndonSystem
+
+
+class TestAndonSystem(BaseTestCase):
+    """Class for testing the AndonSystem's populate_operation_status method"""
+
+    def test_populates_operation_status(self):
+        """Test if the operation status is successfully populated"""
+
+        # Mock operation data
+        mock_operation_data = [
+            {"process_name": "Assembly Line A"},
+            {"process_name": "Assembly Line B"},
+        ]
+
+        # Patch the operation_data to use mock data
+        global operation_data
+        operation_data = mock_operation_data
+
+        # Create an instance of AndonSystem and call the method
+        andon_system = AndonSystem()
+        andon_system.populates_operation_status()
+
+        # Query the database to verify the data was added
+        saved_operations = OperationModel.query.all()
+        assert len(saved_operations) == len(mock_operation_data)
+        assert saved_operations[0].process_name == "Assembly Line A"
+        assert saved_operations[1].process_name == "Assembly Line B"
