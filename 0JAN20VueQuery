@@ -1,0 +1,67 @@
+2. Vue Query Implementation
+Install Vue Query:
+
+bash
+Copy
+Edit
+npm install @tanstack/vue-query
+Set up Vue Query plugin in your app:
+
+javascript
+Copy
+Edit
+import { createApp } from "vue";
+import { VueQueryPlugin } from "@tanstack/vue-query";
+import App from "./App.vue";
+
+const app = createApp(App);
+app.use(VueQueryPlugin);
+app.mount("#app");
+Vue Component using Vue Query and Options API
+javascript
+Copy
+Edit
+<template>
+  <div>
+    <h1>Coordinates with Vue Query</h1>
+    <ul v-if="coordinates">
+      <li v-for="coord in coordinates" :key="coord.process_id">
+        Process ID: {{ coord.process_id }} | Status: {{ coord.operation_status }}
+        | X: {{ coord.x }} | Y: {{ coord.y }}
+      </li>
+    </ul>
+    <p v-else>Loading...</p>
+  </div>
+</template>
+
+<script>
+import { useQuery } from "@tanstack/vue-query";
+
+export default {
+  data() {
+    return {
+      coordinates: [],
+    };
+  },
+  methods: {
+    fetchCoordinates() {
+      return fetch("/api/get-coordinates")
+        .then((response) => {
+          if (!response.ok) throw new Error("Failed to fetch data");
+          return response.json();
+        })
+        .then((data) => data.data);
+    },
+  },
+  created() {
+    const query = useQuery(["coordinates"], this.fetchCoordinates, {
+      refetchInterval: 5000, // Polling every 5 seconds
+      onSuccess: (data) => {
+        this.coordinates = data;
+      },
+    });
+
+    query.refetch(); // Fetch immediately
+  },
+};
+</script>
