@@ -1,0 +1,162 @@
+<template>
+  <div class="container">
+    <CommonPlot
+      :plotData="plotData"
+      :layout="dynamicLayout"
+      :config="config"
+      :dynamicUpdate="generateDynamicData"
+      :updateInterval="1000"
+    />
+    <div class="side-bar">
+      <CommonGauge
+        :currentTemperature="currentTemperature"
+        :currentColor="currentColor"
+        :gaugeLayout="gaugeLayout"
+        :gaugeData="gaugeData"
+      />
+    </div>
+  </div>
+</template>
+
+<script>
+import { plotData, layout, tempData, gaugeLayout, gaugeData } from "./plotConfig.js";
+import CommonPlot from "./CommonPlot.vue";
+import CommonGauge from "./CommonGauge.vue";
+
+export default {
+  components: { CommonPlot, CommonGauge },
+  data() {
+    return {
+      plotData: plotData,
+      layout: layout,
+      config: {},
+      currentTemperature: 0,
+      currentColor: "green", // Default color for the bar
+      temperatureData: tempData,
+      gaugeLayout: gaugeLayout, // Define the layout here
+      gaugeData: gaugeData, // Define the data here
+    };
+  },
+  computed: {
+    dynamicLayout() {
+      if (this.temperatureData.length === 0) {
+        // Add annotation for no data
+        return {
+          ...this.layout,
+          annotations: [
+            {
+              text: "No Data Found",
+              xref: "paper",
+              yref: "paper",
+              x: 0.5,
+              y: 0.5,
+              showarrow: false,
+              font: {
+                size: 20,
+                color: "red",
+              },
+            },
+          ],
+        };
+      }
+      // Default layout without annotation
+      return { ...this.layout, annotations: [] };
+    },
+  },
+  watch: {
+    currentTemperature(newTemp) {
+      this.updateGauge(newTemp);
+    },
+  },
+  methods: {
+    updateGauge(newTemp) {
+      // Update the bar color based on the current temperature
+      this.currentColor = newTemp > 40 ? "red" : newTemp < 10 ? "blue" : "green";
+      this.currentTemperature = newTemp;
+    },
+    generateDynamicData(index) {
+      if (this.temperatureData.length === 0) return {}; // Skip updates if no data
+
+      const temp = this.temperatureData[index % this.temperatureData.length];
+      this.currentTemperature = temp;
+      this.currentColor = temp > 40 ? "red" : temp < 10 ? "blue" : "green";
+
+      const traceUpdates = {
+        data: { x: [[index]], y: [[temp]] },
+        traces: [0],
+      };
+
+      const layoutUpdates = index > 50 ? { "xaxis.range": [index - 50, index] } : {};
+
+      return { traceUpdates, layoutUpdates };
+    },
+  },
+};
+</script>
+
+------
+import { shallowMount } from "@vue/test-utils";
+import YourComponent from "@/components/YourComponent.vue";
+
+describe("YourComponent.vue", () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = shallowMount(YourComponent, {
+      data() {
+        return {
+          layout: {
+            title: "Test Plot",
+          },
+          temperatureData: [],
+        };
+      },
+    });
+  });
+
+  it("should show 'No Data Found' annotation when temperatureData is empty", () => {
+    // Set temperatureData to empty
+    wrapper.setData({ temperatureData: [] });
+
+    // Access the computed property
+    const dynamicLayout = wrapper.vm.dynamicLayout;
+
+    // Assert the annotation is added
+    expect(dynamicLayout.annotations).toEqual([
+      {
+        text: "No Data Found",
+        xref: "paper",
+        yref: "paper",
+        x: 0.5,
+        y: 0.5,
+        showarrow: false,
+        font: {
+          size: 20,
+          color: "red",
+        },
+      },
+    ]);
+  });
+
+  it("should not show any annotations when temperatureData is not empty", () => {
+    // Set temperatureData to non-empty
+    wrapper.setData({ temperatureData: [25, 30, 35] });
+
+    // Access the computed property
+    const dynamicLayout = wrapper.vm.dynamicLayout;
+
+    // Assert no annotations are present
+    expect(dynamicLayout.annotations).toEqual([]);
+  });
+
+  it("should retain the original layout properties", () => {
+    // Set temperatureData to empty
+    wrapper.setData({ temperatureData: [] });
+
+    // Access the computed property
+    const dynamicLayout = wrapper.vm.dynamicLayout;
+
+    // Assert the original layout properties are retained
+    expect(dynamicLayout.title).toBe("Test Plot");
+  });
+});
