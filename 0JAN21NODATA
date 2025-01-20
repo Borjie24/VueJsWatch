@@ -1,0 +1,136 @@
+<template>
+  <div class="container">
+    <CommonPlot
+      :plotData="plotData"
+      :layout="layout"
+      :config="config"
+      :dynamicUpdate="generateDynamicData"
+      :updateInterval="1000"
+    />
+    <div class="side-bar">
+      <CommonGauge
+        :currentTemperature="currentTemperature"
+        :currentColor="currentColor"
+        :gaugeLayout="gaugeLayout"
+        :gaugeData="gaugeData"
+      />
+    </div>
+  </div>
+</template>
+
+<script>
+import { plotData, layout, tempData, gaugeLayout, gaugeData, annotations } from "./plotConfig.js";
+import CommonPlot from "./CommonPlot.vue";
+import CommonGauge from "./CommonGauge.vue"; // Import the new CommonGauge component
+
+export default {
+  components: { CommonPlot, CommonGauge },
+  data() {
+    return {
+      plotData: plotData,
+      layout: layout,
+      config: {},
+      currentTemperature: 0,
+      currentColor: 'green', // Default color for the bar
+      temperatureData: [],
+      gaugeLayout: gaugeLayout, // Define the layout here
+      gaugeData: gaugeData,
+      annotations: annotations
+    };
+  },
+  watch: {
+    currentTemperature(newTemp) {
+      this.updateGauge(newTemp);
+    },
+  },
+  methods: {
+    updateGauge(newTemp) {
+      // Update the bar color based on the current temperature
+      this.currentColor = newTemp > 40 ? "red" : newTemp < 10 ? "blue" : "green";
+      this.currentTemperature = newTemp;
+    },
+    generateDynamicData(index) {
+
+      if (!this.temperatureData || this.temperatureData.length === 0) {
+        // Add "No Data" annotation
+        const layoutUpdates = {
+          annotations: this.annotations,
+        };
+        return { traceUpdates: null, layoutUpdates };
+      }
+
+      const temp = this.temperatureData[index % this.temperatureData.length];
+      this.currentTemperature = temp;
+      this.currentColor = temp > 40 ? "red" : temp < 10 ? "blue" : "green";
+
+      const traceUpdates = {
+        data: { x: [[index]], y: [[temp]] },
+        traces: [0],
+      };
+
+      const layoutUpdates = index > 50 ? { "xaxis.range": [index - 50, index] } : {};
+
+      return { traceUpdates, layoutUpdates };
+    },
+  },
+};
+</script>
+
+<style scoped>
+.container {
+  display: flex;
+  align-items: center;
+}
+.side-bar {
+  width: 500px;
+  height: 500px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-left: 10px;
+}
+</style>
+
+-------------
+import { shallowMount } from '@vue/test-utils';
+import Component from '@/path/to/your/component.vue'; // Update with your actual component path
+
+describe('generateDynamicData', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = shallowMount(Component, {
+      data() {
+        return {
+          temperatureData: [],
+          annotations: [{ text: 'No Data', x: 0, y: 0 }],
+        };
+      },
+    });
+  });
+
+  it('should return "No Data" annotation when temperatureData is empty', () => {
+    const index = 0;
+    const result = wrapper.vm.generateDynamicData(index);
+
+    expect(result).toEqual({
+      traceUpdates: null,
+      layoutUpdates: {
+        annotations: [{ text: 'No Data', x: 0, y: 0 }],
+      },
+    });
+  });
+
+  it('should return "No Data" annotation when temperatureData is undefined', () => {
+    wrapper.setData({ temperatureData: undefined });
+    const index = 0;
+    const result = wrapper.vm.generateDynamicData(index);
+
+    expect(result).toEqual({
+      traceUpdates: null,
+      layoutUpdates: {
+        annotations: [{ text: 'No Data', x: 0, y: 0 }],
+      },
+    });
+  });
+});
