@@ -134,3 +134,75 @@ describe('generateDynamicData', () => {
     });
   });
 });
+
+<script>
+import { plotData, layout, tempData, gaugeLayout, gaugeData } from "./plotConfig.js";
+import CommonPlot from "./CommonPlot.vue";
+import CommonGauge from "./CommonGauge.vue"; // Import the new CommonGauge component
+
+export default {
+  components: { CommonPlot, CommonGauge },
+  data() {
+    return {
+      plotData: plotData,
+      layout: layout,
+      config: {},
+      currentTemperature: 0,
+      currentColor: "green", // Default color for the bar
+      temperatureData: tempData,
+      gaugeLayout: gaugeLayout, // Define the layout here
+      gaugeData: gaugeData, // Define the data here
+    };
+  },
+  watch: {
+    currentTemperature(newTemp) {
+      this.updateGauge(newTemp);
+    },
+  },
+  methods: {
+    updateGauge(newTemp) {
+      // Update the bar color based on the current temperature
+      this.currentColor = newTemp > 40 ? "red" : newTemp < 10 ? "blue" : "green";
+      this.currentTemperature = newTemp;
+    },
+    generateDynamicData(index) {
+      if (!this.temperatureData || this.temperatureData.length === 0) {
+        // Add "No Data" annotation
+        const layoutUpdates = {
+          annotations: [
+            {
+              xref: "paper",
+              yref: "paper",
+              x: 0.5,
+              y: 0.5,
+              xanchor: "center",
+              yanchor: "center",
+              text: "No Data",
+              showarrow: false,
+              font: {
+                size: 24,
+                color: "red",
+              },
+            },
+          ],
+        };
+        return { traceUpdates: null, layoutUpdates };
+      }
+
+      const temp = this.temperatureData[index % this.temperatureData.length];
+      this.currentTemperature = temp;
+      this.currentColor = temp > 40 ? "red" : temp < 10 ? "blue" : "green";
+
+      const traceUpdates = {
+        data: { x: [[index]], y: [[temp]] },
+        traces: [0],
+      };
+
+      const layoutUpdates = index > 50 ? { "xaxis.range": [index - 50, index] } : {};
+
+      return { traceUpdates, layoutUpdates };
+    },
+  },
+};
+</script>
+
