@@ -1,0 +1,33 @@
+import { shallowMount } from '@vue/test-utils';
+import YourComponent from '@/path/to/YourComponent.vue';
+
+describe('YourComponent.vue', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = shallowMount(YourComponent, {
+      data() {
+        return {
+          ambientTemperatureData: [],
+        };
+      },
+    });
+  });
+
+  it('should fetch and set ambient temperature data', async () => {
+    // Mock the fetchAmbientTemperature method
+    const mockData = [
+      { ambient_temperature: 25 },
+      { ambient_temperature: 28 },
+      { ambient_temperature: 30 },
+    ];
+    wrapper.vm.fetchAmbientTemperature = jest.fn().mockResolvedValue(mockData);
+
+    // Call the method
+    await wrapper.vm.setAmbientTemperatureData();
+
+    // Assertions
+    expect(wrapper.vm.fetchAmbientTemperature).toHaveBeenCalled();
+    expect(wrapper.vm.ambientTemperatureData).toEqual([25, 28, 30]);
+  });
+});
