@@ -1,0 +1,180 @@
+<template>
+  <div ref="plot" class="plot-container"></div>
+</template>
+
+<script>
+import Plotly from "plotly.js-dist";
+
+export default {
+  props: {
+    plotData: {
+      type: Array,
+      required: true,
+    },
+    layout: {
+      type: Object,
+      required: true,
+    },
+    config: {
+      type: Object,
+      default: () => ({}),
+    },
+    updateInterval: {
+      type: Number,
+      default: 1000, // Default update interval is 1 second
+    },
+    dynamicUpdate: {
+      type: Function,
+      default: null,
+    },
+  },
+  data() {
+    return {
+      intervalId: null,
+      index: 0, // Tracks the current data point
+      originalData: JSON.parse(JSON.stringify(this.plotData)), // Clone of the initial data
+    };
+  },
+  mounted() {
+    this.initializePlot();
+    if (this.dynamicUpdate) {
+      this.startDynamicUpdates();
+    }
+  },
+  unmounted() {
+    this.clearDynamicUpdates();
+  },
+  methods: {
+    initializePlot() {
+      const config = {
+        ...this.config,
+        scrollZoom: false,
+        displayModeBar: false,
+        responsive: true,
+      };
+
+      Plotly.newPlot(this.$refs.plot, this.plotData, this.layout, config);
+    },
+    updatePlot(traceUpdates, layoutUpdates = {}) {
+      if (traceUpdates) {
+        Plotly.extendTraces(this.$refs.plot, traceUpdates.data, traceUpdates.traces);
+      }
+      if (Object.keys(layoutUpdates).length > 0) {
+        Plotly.relayout(this.$refs.plot, layoutUpdates);
+      }
+    },
+    startDynamicUpdates() {
+      if (this.intervalId) {
+        clearInterval(this.intervalId);
+      }
+      this.intervalId = setInterval(() => {
+        const updateData = this.dynamicUpdate(this.index);
+        if (updateData) {
+          this.updatePlot(updateData.traceUpdates, updateData.layoutUpdates);
+          this.index++;
+        }
+      }, this.updateInterval);
+    },
+    clearDynamicUpdates() {
+      if (this.intervalId) {
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+      }
+    },
+    resetPlot() {
+      // Reset the plot to its original state
+      this.index = 0; // Reset index to the start
+      Plotly.newPlot(this.$refs.plot, this.originalData, this.layout, this.config);
+    },
+    resumePlot() {
+      // Resume dynamic updates from the current index
+      if (this.dynamicUpdate) {
+        this.startDynamicUpdates();
+      }
+    },
+  },
+};
+</script>
+--------
+import { shallowMount } from '@vue/test-utils';
+import PlotlyComponent from '@/components/PlotlyComponent.vue'; // Adjust the path as needed
+import Plotly from 'plotly.js-dist';
+
+jest.mock('plotly.js-dist', () => ({
+  newPlot: jest.fn(),
+  extendTraces: jest.fn(),
+  relayout: jest.fn(),
+}));
+
+describe('PlotlyComponent', () => {
+  const plotData = [
+    { x: [1, 2, 3], y: [10, 15, 13], type: 'scatter', mode: 'lines+markers' },
+  ];
+  const layout = { title: 'Test Plot' };
+  const dynamicUpdateMock = jest.fn((index) => ({
+    traceUpdates: { data: [[index]], traces: [0] },
+  }));
+
+  const config = { responsive: true };
+
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = shallowMount(PlotlyComponent, {
+      props: {
+        plotData,
+        layout,
+        config,
+        dynamicUpdate: dynamicUpdateMock,
+        updateInterval: 500,
+      },
+    });
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    wrapper.unmount();
+  });
+
+  it('initializes the plot on mount', () => {
+    expect(Plotly.newPlot).toHaveBeenCalledWith(
+      wrapper.vm.$refs.plot,
+      plotData,
+      layout,
+      expect.objectContaining(config)
+    );
+  });
+
+  it('starts dynamic updates if dynamicUpdate is provided', () => {
+    jest.advanceTimersByTime(500);
+    expect(dynamicUpdateMock).toHaveBeenCalledWith(0);
+    expect(Plotly.extendTraces).toHaveBeenCalledWith(
+      wrapper.vm.$refs.plot,
+      { data: [[0]], traces: [0] }
+    );
+  });
+
+  it('resets the plot when resetPlot is called', async () => {
+    await wrapper.vm.resetPlot();
+    expect(wrapper.vm.index).toBe(0);
+    expect(Plotly.newPlot).toHaveBeenCalledWith(
+      wrapper.vm.$refs.plot,
+      plotData,
+      layout,
+      expect.objectContaining(config)
+    );
+  });
+
+  it('resumes plotting when resumePlot is called', () => {
+    wrapper.vm.clearDynamicUpdates();
+    wrapper.vm.resumePlot();
+    jest.advanceTimersByTime(500);
+    expect(dynamicUpdateMock).toHaveBeenCalled();
+  });
+
+  it('clears interval when unmounted', () => {
+    const clearIntervalSpy = jest.spyOn(window, 'clearInterval');
+    wrapper.unmount();
+    expect(clearIntervalSpy).toHaveBeenCalledWith(wrapper.vm.intervalId);
+  });
+});
