@@ -131,6 +131,7 @@ export default {
       this.startDynamicUpdates();
     }
   },
+unmounted (){ clearInterval(thi.intervalId)}
   methods: {
    initializePlot() {
   const config = {
